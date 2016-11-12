@@ -1,5 +1,5 @@
 *** EVALUATION ***
-PROGRAM "M:\Desktop\SourceFiles\Spr2016\MiniProject\MiniPrj_S16\bin\Project.abs"
+PROGRAM "C:\Users\Will\Documents\Purdue\Classes\5_2016F\ECE 362\Cruise-Control-HUD\MiniPrj_F16\bin\Project.abs"
 
 *********************************************************************************************
 TARGET SECTION
@@ -15,6 +15,7 @@ FILE SECTION
 mc9s12c32.c.o                           Model: SMALL,         Lang: ANSI-C
 main.c.o                                Model: SMALL,         Lang: ANSI-C
 Start12.c.o                             Model: SMALL,         Lang: ANSI-C
+rtshc12.c.o (ansisi.lib)                Model: SMALL,         Lang: ANSI-C
 
 *********************************************************************************************
 STARTUP SECTION
@@ -22,8 +23,9 @@ STARTUP SECTION
 Entry point: 0xC029 (_Startup)
 _startupData is allocated at 0xC031 and uses 6 Bytes
 extern struct _tagStartup {
-  unsigned nofZeroOut     0
-  _Copy    *toCopyDownBeg 0xC078
+  unsigned nofZeroOut     1
+  _Range   pZeroOut       0x900     8
+  _Copy    *toCopyDownBeg 0xC250
 } _startupData;
 
 *********************************************************************************************
@@ -32,8 +34,8 @@ Section Name                    Size  Type     From       To       Segment
 ---------------------------------------------------------------------------------------------
 .init                             49     R     0xC000     0xC030   ROM_C000
 .startData                        10     R     0xC031     0xC03A   ROM_C000
-.text                             61     R     0xC03B     0xC077   ROM_C000
-.copy                              2     R     0xC078     0xC079   ROM_C000
+.text                            513     R     0xC03B     0xC23B   ROM_C000
+.copy                              2     R     0xC250     0xC251   ROM_C000
 .stack                           256   R/W      0x800      0x8FF   RAM
 .abs_section_8                     1   N/I        0x8        0x8   .absSeg0
 .abs_section_9                     1   N/I        0x9        0x9   .absSeg1
@@ -259,11 +261,13 @@ Section Name                    Size  Type     From       To       Segment
 .abs_section_fff0                  2     R     0xFFF0     0xFFF1   .absSeg221
 .abs_section_ffe0                  2     R     0xFFE0     0xFFE1   .absSeg222
 .abs_section_ffd6                  2     R     0xFFD6     0xFFD7   .absSeg223
+.bss                               8   R/W      0x900      0x907   RAM
+RUNTIME                           20     R     0xC23C     0xC24F   ROM_C000
 .vectSeg224_vect                   2     R     0xFFFE     0xFFFF   .vectSeg224
 
 Summary of section sizes per section type:
-READ_ONLY (R):          82 (dec:      130)
-READ_WRITE (R/W):      100 (dec:      256)
+READ_ONLY (R):         25A (dec:      602)
+READ_WRITE (R/W):      108 (dec:      264)
 NO_INIT (N/I):         104 (dec:      260)
 
 *********************************************************************************************
@@ -308,24 +312,24 @@ MODULE:                 -- mc9s12c32.c.o --
      _SYNR                                       34       1       1       1   .abs_section_34
      _REFDV                                      35       1       1       1   .abs_section_35
      _CRGFLG                                     37       1       1       2   .abs_section_37
-     _CRGINT                                     38       1       1       0   .abs_section_38
+     _CRGINT                                     38       1       1       1   .abs_section_38
      _CLKSEL                                     39       1       1       2   .abs_section_39
      _PLLCTL                                     3A       1       1       1   .abs_section_3a
-     _RTICTL                                     3B       1       1       0   .abs_section_3b
+     _RTICTL                                     3B       1       1       1   .abs_section_3b
      _COPCTL                                     3C       1       1       1   .abs_section_3c
      _ARMCOP                                     3F       1       1       0   .abs_section_3f
-     _TIOS                                       40       1       1       0   .abs_section_40
+     _TIOS                                       40       1       1       1   .abs_section_40
      _CFORC                                      41       1       1       0   .abs_section_41
      _OC7M                                       42       1       1       0   .abs_section_42
      _OC7D                                       43       1       1       0   .abs_section_43
-     _TSCR1                                      46       1       1       0   .abs_section_46
+     _TSCR1                                      46       1       1       1   .abs_section_46
      _TTOV                                       47       1       1       0   .abs_section_47
      _TCTL1                                      48       1       1       0   .abs_section_48
      _TCTL2                                      49       1       1       0   .abs_section_49
      _TCTL3                                      4A       1       1       0   .abs_section_4a
      _TCTL4                                      4B       1       1       0   .abs_section_4b
-     _TIE                                        4C       1       1       0   .abs_section_4c
-     _TSCR2                                      4D       1       1       0   .abs_section_4d
+     _TIE                                        4C       1       1       1   .abs_section_4c
+     _TSCR2                                      4D       1       1       1   .abs_section_4d
      _TFLG1                                      4E       1       1       1   .abs_section_4e
      _TFLG2                                      4F       1       1       0   .abs_section_4f
      _PACTL                                      60       1       1       0   .abs_section_60
@@ -333,19 +337,19 @@ MODULE:                 -- mc9s12c32.c.o --
      _ATDSTAT0                                   86       1       1       0   .abs_section_86
      _ATDTEST1                                   89       1       1       0   .abs_section_89
      _ATDSTAT1                                   8B       1       1       0   .abs_section_8b
-     _ATDDIEN                                    8D       1       1       0   .abs_section_8d
-     _PORTAD0                                    8F       1       1       0   .abs_section_8f
+     _ATDDIEN                                    8D       1       1       1   .abs_section_8d
+     _PORTAD0                                    8F       1       1       2   .abs_section_8f
      _SCICR1                                     CA       1       1       1   .abs_section_ca
      _SCICR2                                     CB       1       1       1   .abs_section_cb
      _SCISR1                                     CC       1       1       0   .abs_section_cc
      _SCISR2                                     CD       1       1       0   .abs_section_cd
      _SCIDRH                                     CE       1       1       0   .abs_section_ce
      _SCIDRL                                     CF       1       1       0   .abs_section_cf
-     _SPICR1                                     D8       1       1       0   .abs_section_d8
-     _SPICR2                                     D9       1       1       0   .abs_section_d9
-     _SPIBR                                      DA       1       1       0   .abs_section_da
-     _SPISR                                      DB       1       1       0   .abs_section_db
-     _SPIDR                                      DD       1       1       0   .abs_section_dd
+     _SPICR1                                     D8       1       1       1   .abs_section_d8
+     _SPICR2                                     D9       1       1       1   .abs_section_d9
+     _SPIBR                                      DA       1       1       1   .abs_section_da
+     _SPISR                                      DB       1       1       1   .abs_section_db
+     _SPIDR                                      DD       1       1       1   .abs_section_dd
      _PWME                                       E0       1       1       0   .abs_section_e0
      _PWMPOL                                     E1       1       1       0   .abs_section_e1
      _PWMCLK                                     E2       1       1       0   .abs_section_e2
@@ -418,9 +422,9 @@ MODULE:                 -- mc9s12c32.c.o --
      _CANTXDSR7                                 17B       1       1       0   .abs_section_17b
      _CANTXDLR                                  17C       1       1       0   .abs_section_17c
      _CANTXTBPR                                 17D       1       1       0   .abs_section_17d
-     _PTT                                       240       1       1       0   .abs_section_240
+     _PTT                                       240       1       1      17   .abs_section_240
      _PTIT                                      241       1       1       0   .abs_section_241
-     _DDRT                                      242       1       1       0   .abs_section_242
+     _DDRT                                      242       1       1       1   .abs_section_242
      _RDRT                                      243       1       1       0   .abs_section_243
      _PERT                                      244       1       1       0   .abs_section_244
      _PPST                                      245       1       1       0   .abs_section_245
@@ -457,7 +461,7 @@ MODULE:                 -- mc9s12c32.c.o --
      _PIFJ                                      26F       1       1       0   .abs_section_26f
      _PTAD                                      270       1       1       0   .abs_section_270
      _PTIAD                                     271       1       1       0   .abs_section_271
-     _DDRAD                                     272       1       1       0   .abs_section_272
+     _DDRAD                                     272       1       1       1   .abs_section_272
      _RDRAD                                     273       1       1       0   .abs_section_273
      _PERAD                                     274       1       1       0   .abs_section_274
      _PPSAD                                     275       1       1       0   .abs_section_275
@@ -476,7 +480,7 @@ MODULE:                 -- mc9s12c32.c.o --
      _TC4                                        58       2       2       0   .abs_section_58
      _TC5                                        5A       2       2       0   .abs_section_5a
      _TC6                                        5C       2       2       0   .abs_section_5c
-     _TC7                                        5E       2       2       0   .abs_section_5e
+     _TC7                                        5E       2       2       1   .abs_section_5e
      _PACNT                                      62       2       2       0   .abs_section_62
      _ATDCTL23                                   82       2       2       0   .abs_section_82
      _ATDCTL45                                   84       2       2       0   .abs_section_84
@@ -502,12 +506,26 @@ MODULE:                 -- mc9s12c32.c.o --
      _CANTXTSR                                  17E       2       2       0   .abs_section_17e
 MODULE:                 -- main.c.o --
 - PROCEDURES:
-     initializations                           C03B      2C      44       1   .text       
-     main                                      C067       8       8       1   .text       
-     RTI_ISR                                   C06F       4       4       1   .text       
-     TIM_ISR                                   C073       4       4       1   .text       
-     SCI_ISR                                   C077       1       1       1   .text       
+     initializations                           C03B      67     103       1   .text       
+     main                                      C0A2      65     101       1   .text       
+     RTI_ISR                                   C107      42      66       1   .text       
+     TIM_ISR                                   C149       A      10       1   .text       
+     SCI_ISR                                   C153       1       1       1   .text       
+     shortwait                                 C154       A      10       1   .text       
+     shiftout                                  C15E      14      20       1   .text       
+     send_byte                                 C172       F      15       1   .text       
+     print_digit                               C181      38      56       3   .text       
+     shift_disp                                C1B9      36      54       2   .text       
+     print_number                              C1EF      36      54       1   .text       
+     wait                                      C225      17      23       1   .text       
 - VARIABLES:
+     leftpb                                     900       1       1       3   .bss        
+     rghtpb                                     901       1       1       3   .bss        
+     prevleftpb                                 902       1       1       2   .bss        
+     prevrghtpb                                 903       1       1       2   .bss        
+     count                                      904       1       1       3   .bss        
+     num                                        905       2       2       3   .bss        
+     cur_digit                                  907       1       1       2   .bss        
      _Vector_7                                 FFF0       2       2       0   .abs_section_fff0
      _Vector_15                                FFE0       2       2       0   .abs_section_ffe0
      _Vector_20                                FFD6       2       2       0   .abs_section_ffd6
@@ -519,21 +537,29 @@ MODULE:                 -- Start12.c.o --
      _startupData                              C031       6       6       3   .startData  
 - LABELS:
      __SEG_END_SSTACK                           900       0       0       1               
+MODULE:                 -- rtshc12.c.o (ansisi.lib) --
+- PROCEDURES:
+     _CASE_CHECKED_BYTE                        C23C      14      20       2   RUNTIME     
+- VARIABLES:
 
 *********************************************************************************************
 MODULE STATISTIC
   Name                                      Data   Code  Const
 ---------------------------------------------------------------------------------------------
   mc9s12c32.c.o                              260      0      0
-  main.c.o                                     0     61      6
+  main.c.o                                     8    513      6
   Start12.c.o                                  0     49      0
+  rtshc12.c.o (ansisi.lib)                     0     20      0
   other                                      256     12      2
 
 *********************************************************************************************
 SECTION USE IN OBJECT-ALLOCATION SECTION
 ---------------------------------------------------------------------------------------------
 SECTION: ".text"
-  initializations main RTI_ISR TIM_ISR SCI_ISR 
+  initializations main RTI_ISR TIM_ISR SCI_ISR shortwait shiftout send_byte 
+  print_digit shift_disp print_number wait 
+SECTION: ".bss"
+  leftpb rghtpb prevleftpb prevrghtpb count num cur_digit 
 SECTION: ".init"
   Init _Startup 
 SECTION: ".abs_section_8"
@@ -984,6 +1010,8 @@ SECTION: ".abs_section_ffe0"
   _Vector_15 
 SECTION: ".abs_section_ffd6"
   _Vector_20 
+SECTION: "RUNTIME"
+  _CASE_CHECKED_BYTE 
 
 *********************************************************************************************
 OBJECT LIST SORTED BY ADDRESS
@@ -1025,25 +1053,25 @@ OBJECT LIST SORTED BY ADDRESS
      _SYNR                                       34       1       1       1   .abs_section_34
      _REFDV                                      35       1       1       1   .abs_section_35
      _CRGFLG                                     37       1       1       2   .abs_section_37
-     _CRGINT                                     38       1       1       0   .abs_section_38
+     _CRGINT                                     38       1       1       1   .abs_section_38
      _CLKSEL                                     39       1       1       2   .abs_section_39
      _PLLCTL                                     3A       1       1       1   .abs_section_3a
-     _RTICTL                                     3B       1       1       0   .abs_section_3b
+     _RTICTL                                     3B       1       1       1   .abs_section_3b
      _COPCTL                                     3C       1       1       1   .abs_section_3c
      _ARMCOP                                     3F       1       1       0   .abs_section_3f
-     _TIOS                                       40       1       1       0   .abs_section_40
+     _TIOS                                       40       1       1       1   .abs_section_40
      _CFORC                                      41       1       1       0   .abs_section_41
      _OC7M                                       42       1       1       0   .abs_section_42
      _OC7D                                       43       1       1       0   .abs_section_43
      _TCNT                                       44       2       2       0   .abs_section_44
-     _TSCR1                                      46       1       1       0   .abs_section_46
+     _TSCR1                                      46       1       1       1   .abs_section_46
      _TTOV                                       47       1       1       0   .abs_section_47
      _TCTL1                                      48       1       1       0   .abs_section_48
      _TCTL2                                      49       1       1       0   .abs_section_49
      _TCTL3                                      4A       1       1       0   .abs_section_4a
      _TCTL4                                      4B       1       1       0   .abs_section_4b
-     _TIE                                        4C       1       1       0   .abs_section_4c
-     _TSCR2                                      4D       1       1       0   .abs_section_4d
+     _TIE                                        4C       1       1       1   .abs_section_4c
+     _TSCR2                                      4D       1       1       1   .abs_section_4d
      _TFLG1                                      4E       1       1       1   .abs_section_4e
      _TFLG2                                      4F       1       1       0   .abs_section_4f
      _TC0                                        50       2       2       0   .abs_section_50
@@ -1053,7 +1081,7 @@ OBJECT LIST SORTED BY ADDRESS
      _TC4                                        58       2       2       0   .abs_section_58
      _TC5                                        5A       2       2       0   .abs_section_5a
      _TC6                                        5C       2       2       0   .abs_section_5c
-     _TC7                                        5E       2       2       0   .abs_section_5e
+     _TC7                                        5E       2       2       1   .abs_section_5e
      _PACTL                                      60       1       1       0   .abs_section_60
      _PAFLG                                      61       1       1       0   .abs_section_61
      _PACNT                                      62       2       2       0   .abs_section_62
@@ -1062,8 +1090,8 @@ OBJECT LIST SORTED BY ADDRESS
      _ATDSTAT0                                   86       1       1       0   .abs_section_86
      _ATDTEST1                                   89       1       1       0   .abs_section_89
      _ATDSTAT1                                   8B       1       1       0   .abs_section_8b
-     _ATDDIEN                                    8D       1       1       0   .abs_section_8d
-     _PORTAD0                                    8F       1       1       0   .abs_section_8f
+     _ATDDIEN                                    8D       1       1       1   .abs_section_8d
+     _PORTAD0                                    8F       1       1       2   .abs_section_8f
      _ATDDR0                                     90       2       2       0   .abs_section_90
      _ATDDR1                                     92       2       2       0   .abs_section_92
      _ATDDR2                                     94       2       2       0   .abs_section_94
@@ -1079,11 +1107,11 @@ OBJECT LIST SORTED BY ADDRESS
      _SCISR2                                     CD       1       1       0   .abs_section_cd
      _SCIDRH                                     CE       1       1       0   .abs_section_ce
      _SCIDRL                                     CF       1       1       0   .abs_section_cf
-     _SPICR1                                     D8       1       1       0   .abs_section_d8
-     _SPICR2                                     D9       1       1       0   .abs_section_d9
-     _SPIBR                                      DA       1       1       0   .abs_section_da
-     _SPISR                                      DB       1       1       0   .abs_section_db
-     _SPIDR                                      DD       1       1       0   .abs_section_dd
+     _SPICR1                                     D8       1       1       1   .abs_section_d8
+     _SPICR2                                     D9       1       1       1   .abs_section_d9
+     _SPIBR                                      DA       1       1       1   .abs_section_da
+     _SPISR                                      DB       1       1       1   .abs_section_db
+     _SPIDR                                      DD       1       1       1   .abs_section_dd
      _PWME                                       E0       1       1       0   .abs_section_e0
      _PWMPOL                                     E1       1       1       0   .abs_section_e1
      _PWMCLK                                     E2       1       1       0   .abs_section_e2
@@ -1167,9 +1195,9 @@ OBJECT LIST SORTED BY ADDRESS
      _CANTXDLR                                  17C       1       1       0   .abs_section_17c
      _CANTXTBPR                                 17D       1       1       0   .abs_section_17d
      _CANTXTSR                                  17E       2       2       0   .abs_section_17e
-     _PTT                                       240       1       1       0   .abs_section_240
+     _PTT                                       240       1       1      17   .abs_section_240
      _PTIT                                      241       1       1       0   .abs_section_241
-     _DDRT                                      242       1       1       0   .abs_section_242
+     _DDRT                                      242       1       1       1   .abs_section_242
      _RDRT                                      243       1       1       0   .abs_section_243
      _PERT                                      244       1       1       0   .abs_section_244
      _PPST                                      245       1       1       0   .abs_section_245
@@ -1206,17 +1234,32 @@ OBJECT LIST SORTED BY ADDRESS
      _PIFJ                                      26F       1       1       0   .abs_section_26f
      _PTAD                                      270       1       1       0   .abs_section_270
      _PTIAD                                     271       1       1       0   .abs_section_271
-     _DDRAD                                     272       1       1       0   .abs_section_272
+     _DDRAD                                     272       1       1       1   .abs_section_272
      _RDRAD                                     273       1       1       0   .abs_section_273
      _PERAD                                     274       1       1       0   .abs_section_274
      _PPSAD                                     275       1       1       0   .abs_section_275
+     leftpb                                     900       1       1       3   .bss        
+     rghtpb                                     901       1       1       3   .bss        
+     prevleftpb                                 902       1       1       2   .bss        
+     prevrghtpb                                 903       1       1       2   .bss        
+     count                                      904       1       1       3   .bss        
+     num                                        905       2       2       3   .bss        
+     cur_digit                                  907       1       1       2   .bss        
      Init                                      C000      29      41       1   .init       
      _Startup                                  C029       8       8       0   .init       
-     initializations                           C03B      2C      44       1   .text       
-     main                                      C067       8       8       1   .text       
-     RTI_ISR                                   C06F       4       4       1   .text       
-     TIM_ISR                                   C073       4       4       1   .text       
-     SCI_ISR                                   C077       1       1       1   .text       
+     initializations                           C03B      67     103       1   .text       
+     main                                      C0A2      65     101       1   .text       
+     RTI_ISR                                   C107      42      66       1   .text       
+     TIM_ISR                                   C149       A      10       1   .text       
+     SCI_ISR                                   C153       1       1       1   .text       
+     shortwait                                 C154       A      10       1   .text       
+     shiftout                                  C15E      14      20       1   .text       
+     send_byte                                 C172       F      15       1   .text       
+     print_digit                               C181      38      56       3   .text       
+     shift_disp                                C1B9      36      54       2   .text       
+     print_number                              C1EF      36      54       1   .text       
+     wait                                      C225      17      23       1   .text       
+     _CASE_CHECKED_BYTE                        C23C      14      20       2   RUNTIME     
      _Vector_20                                FFD6       2       2       0   .abs_section_ffd6
      _Vector_15                                FFE0       2       2       0   .abs_section_ffe0
      _Vector_7                                 FFF0       2       2       0   .abs_section_fff0
@@ -1226,12 +1269,22 @@ UNUSED-OBJECTS SECTION
 ---------------------------------------------------------------------------------------------
 NOT USED PROCEDURES
 main.c.o:
-  inchar outchar 
+  to_bcd inchar outchar 
+rtshc12.c.o (ansisi.lib):
+  _BSHL _BSHRS _BSHRU _BDIVMODU _BDIVMODS _ISHL _ISHRU _ISHRS _LSHL _LSHRU 
+  _LSHRS _LADD _LSUB _LAND _LOR _LXOR _LCMP _LCMP_P _LCMP_PP _LNEG _LCOM _LINC 
+  _LDEC _LMUL _LMULU16x32 _LMULS16x32 _lDivMod _LDIVU _NEG_P _LDIVS _LMODU 
+  _LMODS _ILSEXT _COPY _CASE_DIRECT _CASE_DIRECT_BYTE _CASE_CHECKED 
+  _CASE_SEARCH _CASE_SEARCH_BYTE _CASE_SEARCH_8 _CASE_SEARCH_8_BYTE _FCALL 
+  _FPCMP 
+NOT USED VARIABLES
+rtshc12.c.o (ansisi.lib):
+  _PowOfTwo_8 _PowOfTwo_16 _PowOfTwo_32 errno 
 
 *********************************************************************************************
 COPYDOWN SECTION
 ---------------------------------------------------------------------------------------------
-------- ROM-ADDRESS: 0xC078 ---- SIZE       2 ---
+------- ROM-ADDRESS: 0xC250 ---- SIZE       2 ---
 Filling bytes inserted
  0000
 
@@ -1241,10 +1294,19 @@ OBJECT-DEPENDENCIES SECTION
 Init                      USES _startupData 
 _Startup                  USES __SEG_END_SSTACK Init main 
 initializations           USES _CLKSEL _PLLCTL _SYNR _REFDV _CRGFLG _COPCTL 
-                                _SCIBD _SCICR1 _SCICR2 _DDRAB _PORTAB 
-main                      USES initializations 
-RTI_ISR                   USES _CRGFLG 
-TIM_ISR                   USES _TFLG1 
+                                _SCIBD _SCICR1 _SCICR2 _DDRAB _PORTAB _SPIBR _SPICR1 
+                                _SPICR2 _RTICTL _CRGINT _TSCR1 _TSCR2 _TIOS _TIE _TC7 
+                                _DDRAD _ATDDIEN _DDRT _PTT 
+main                      USES initializations wait num leftpb count 
+                                print_digit _PTT rghtpb shift_disp 
+RTI_ISR                   USES _PORTAD0 prevleftpb leftpb prevrghtpb rghtpb 
+                                _CRGFLG 
+TIM_ISR                   USES _TFLG1 num print_number 
+shiftout                  USES _SPISR _SPIDR 
+send_byte                 USES shiftout _PTT 
+print_digit               USES _CASE_CHECKED_BYTE send_byte 
+shift_disp                USES cur_digit _PTT _CASE_CHECKED_BYTE 
+print_number              USES shift_disp print_digit shortwait 
 _Vector_20                USES SCI_ISR 
 _Vector_15                USES TIM_ISR 
 _Vector_7                 USES RTI_ISR 
@@ -1257,7 +1319,21 @@ DEPENDENCY TREE
  +- main                
  |  | 
  |  +- initializations     
- |       
+ |  |    
+ |  +- wait                
+ |  |    
+ |  +- print_digit         
+ |  |  | 
+ |  |  +- _CASE_CHECKED_BYTE  
+ |  |  |    
+ |  |  +- send_byte           
+ |  |     | 
+ |  |     +- shiftout            
+ |  |          
+ |  +- shift_disp          
+ |     | 
+ |     +- _CASE_CHECKED_BYTE   (see above)
+ |        
  +- _Startup            
     | 
     +- Init                
@@ -1271,7 +1347,15 @@ DEPENDENCY TREE
  _Vector_15          
  | 
  +- TIM_ISR             
-      
+    | 
+    +- print_number        
+       | 
+       +- shift_disp           (see above)
+       |  
+       +- print_digit          (see above)
+       |  
+       +- shortwait           
+            
  _Vector_20          
  | 
  +- SCI_ISR             
@@ -1283,5 +1367,5 @@ STATISTIC SECTION
 ExeFile:
 --------
 Number of blocks to be downloaded: 8
-Total size of all blocks to be downloaded: 130
+Total size of all blocks to be downloaded: 602
 
