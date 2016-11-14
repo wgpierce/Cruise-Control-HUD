@@ -1,3 +1,4 @@
 #CodeWarrior Files
-bin
 
+bin
+*.o
