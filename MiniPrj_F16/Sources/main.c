@@ -10,9 +10,9 @@
 
  Team Members:
 
-   - Team/Doc Leader: < Patrick May >      Signature: ______________________
+   - Team/Doc Leader: Patrick May      Signature: ______________________
    
-   - Software Leader: < William Pierce >      Signature: ______________________
+   - Software Leader: William Pierce   Signature: ______________________
 
    - Interface Leader: < ? >     Signature: ______________________
 
@@ -110,6 +110,9 @@ Section 6
   ------------------------------------------
   Nov 11  Will      Wrote shift register and LED driver
 
+  Nov 12  Will      finished multidigit operation and
+                    adjusted timing parameters for LED driver
+  
           Tyler
 		  
 		      Pat
@@ -126,11 +129,8 @@ Section 7
   
   Person to do this task : Tasks to be done 
   -----------------------------------------
-  Will                     finish driver for multidigit operation
   
-  <Will>                   adjust timing parameters 
-  
-  <>                       write LIDAR driver 
+  <Will>                   write LIDAR driver 
 
   <>                       write OBD interface driver
 
@@ -167,11 +167,19 @@ Section 8
 #define leftLED PTT_PTT1
 #define rghtLED PTT_PTT0
 
+/* Pushbutton pin selectors */
+#define leftPB PORTAD0_PTAD7
+#define rghtPB PORTAD0_PTAD6
+
 
 /* END PORT DELCARATIONS */
 
 /* LED position select masks */
 
+//OR PTT with this one
+#define D_NONE 0xF0
+
+//AND PTT with these
 #define DIGIT0 0b01111111
 #define DIGIT1 0b10111111
 #define DIGIT2 0b11011111
@@ -206,27 +214,27 @@ Section 8
 #define DECIMAL 0b00000001
 
 
-/* All functions after main initialized here */
-void shiftout(char);
+/* All functions after main declared here */
+void LED_wait(void);
+void shift_out(char);
 void send_byte(char);
 void print_digit(char);
-void shift_disp(void);
-short to_bcd(short);
+void select_disp(char);
 void print_number(short);
 
 void wait(int);
 char inchar(void);
 void outchar(char);
 
-
 /* Global Variable declarations */
-char leftpb	= 0;  // left pushbutton flag
-char rghtpb	= 0;  // right pushbutton flag
+char leftpb_flag	= 0;  // left pushbutton flag
+char rghtpb_flag	= 0;  // right pushbutton flag
 char prevleftpb = 0; // previous pushbutton states
 char prevrghtpb	= 0;
 
 char count = 0;
 short num = 0;
+long counter = 0;
 
 char cur_digit = 0;
 
@@ -267,14 +275,21 @@ void  initializations(void)
   RTICTL = 0x48; //value pulled from timing excel sheet
   CRGINT_RTIE = 1;  //enable/reset RTI
   
-/* Initialize TIM Ch 7 (TC7) for periodic interrupts every 1.000 ms  */
+/* Initialize TIM Ch 7 (TC7) for periodic interrupts at 50 Hz = every 20 ms */
   
    TSCR1 = 0x80; //enable timer
-   TSCR2 = 0x0D; //set prescale to 32
+   TSCR2 = 0x0E; //set prescale to 64
    TIOS =  0x80; //set ch7 for output compare
    TIE =   0x80; //enable ch7 interrupt
-   TC7 =   750;  //trigger value for 1ms interrupts  
-  	 	   			 		  			 		  		
+   TC7 =   7500; //trigger value for 50ms interrupts                    
+   //TC7 = (24E6 / 64) / x Hz 	   			 		  			 		  		
+                 //the value here determines the refresh rate of the LEDs
+                 //50Hz is the experimental minumum for the LED refresh 
+                 //rate to not be noticeable to the human eye
+                 
+                 //Note that the longer this is, the less time
+                 //other parts of the program have to run
+
 
 /* Initialize digital I/O port pins */
 
@@ -294,7 +309,7 @@ void  initializations(void)
 
 /* Initialize states of peripheral devices */   
   
-  PTT = DIGIT2;  //LED display to display digit 0
+  PTT = PTT | D_NONE;  //LED display to display digit 0
  
   SRCLR_N = 0;   //initially clear LED
   SRCLR_N = 1;
@@ -316,14 +331,15 @@ void main(void)
 	EnableInterrupts;
 
   for(;;) {
-  
-    wait(1000);
-
-    num++;
-
-    if (leftpb) {
+      
+    if (++counter % 50 == 0) {
+      num++;
+    }
+    
+    
+    if (leftpb_flag) {
       //update display for each
-      leftpb = 0; 
+      leftpb_flag = 0; 
       count = (char)((count + 1) % 10);
       print_digit(count);
 
@@ -331,11 +347,9 @@ void main(void)
 
     }
 
-    if (rghtpb) {
-      rghtpb = 0;
-      //shift through displays
-      shift_disp();
-
+    if (rghtpb_flag) {
+      rghtpb_flag = 0;
+      
       print_digit(count);
 
       rghtLED = rghtLED ^ 1;
@@ -358,18 +372,18 @@ interrupt 7 void RTI_ISR(void)
 { 
   //Debounce buttons
   //Note this asserts the button flag upon pushing the button down
-  char currLeft = PORTAD0_PTAD7;
-  char currRght = PORTAD0_PTAD6;
+  char currLeft = leftPB;
+  char currRght = rghtPB;
   
   if (prevleftpb == 1) {
     if (currLeft == 0) {
-      leftpb = 1;
+      leftpb_flag = 1;
     }
   }
   
   if (prevrghtpb == 1) {
     if (currRght == 0) {
-      rghtpb = 1;
+      rghtpb_flag = 1;
     }
   }
 
@@ -389,10 +403,14 @@ interrupt 7 void RTI_ISR(void)
 
 interrupt 15 void TIM_ISR(void)
 {
+  
+  print_number(num);
+
+  
   // clear TIM CH 7 interrupt flag 
  	TFLG1 = TFLG1 | 0x80; 
   
-  print_number(num);
+  
 
 
 }
@@ -413,14 +431,19 @@ interrupt 20 void SCI_ISR(void)
 
 /*
 ***********************************************************************
-  shortwait: Delay for approx .02 ms
+  short_wait: Delay for approx .9 ms
+  long enough to display a 7-segment
+  
+  the loop limit in this function determines the
+  brightness of the LEDs
 ***********************************************************************
 */
 
-void shortwait()
+void LED_wait()
 {
   int i;
-  for (i = 0; i < 900; i++);
+  //any less than 10000 and the LEDs are dim
+  for (i = 0; i < 15000; i++);
 }
 
 /*
@@ -430,7 +453,7 @@ void shortwait()
 ***********************************************************************
 */
  
-void shiftout(char x)
+void shift_out(char x)
 {  
   int i;
   while (SPISR_SPTEF == 0);
@@ -447,7 +470,7 @@ void shiftout(char x)
 void send_byte(char x)
 {
   // shift out character
-  shiftout(x);
+  shift_out(x);
   // pulse LCD clock line low->high->low
   RCLK = 0;
   RCLK = 1;
@@ -501,14 +524,14 @@ void print_digit(char x)
 
 /*
 *********************************************************************** 
-  shift_disp: shifts LED display to the next position to the left 
+  shift_disp: shifts LED display to the desired position
+              select non 0-3 digit to deselect all positions
 ***********************************************************************
 */
 
-void shift_disp()
+void select_disp(char cur_digit)
 {
-  cur_digit = (char)((cur_digit + 1) % 4); 
-  PTT = PTT | 0xF0; //clear all select digits
+  PTT = PTT | D_NONE; //clear all select digits
   
   //select desired digit
   switch (cur_digit) {
@@ -525,24 +548,10 @@ void shift_disp()
       PTT = PTT & DIGIT3;
       break;
     default:
-      PTT = PTT & DIGIT0;
+      break;
   }
   
 }
-
-
-/*
-*********************************************************************** 
-  to_bcd: converts binary encoded number as returned bcd number 
-***********************************************************************
-*/
-
-short to_bcd(short x) {
-  
-  
-  return x;
-}
-
 
 /*
 *********************************************************************** 
@@ -556,23 +565,26 @@ void print_number(short x)
   char i = 0;
   short exp = 10;
   short last_exp = 1;
-  char curr = 0;
   for (; i < 4; i++, exp *= 10) {
-    shift_disp();
+    select_disp(i);
     //use modulo to cut off upper values 
     //use integer division to cut off lower values 
-    curr = (char)((x % exp) / last_exp);
-    print_digit(curr);
-    shortwait(); //wait for a bit so it can be displayed
+    print_digit((char)((x % exp) / last_exp));
+    LED_wait(); //wait for a bit so it can be displayed
     
     last_exp = exp;
   }
+  
+  select_disp(-1);
+  
 }
 
 
 /*
 *********************************************************************** 
   wait: waits for approximately n milliseconds
+        note this can get interrupted, if not
+        called from an interrupt
 ***********************************************************************
 */
 
