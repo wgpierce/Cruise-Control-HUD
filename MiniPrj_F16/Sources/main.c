@@ -132,7 +132,7 @@ Section 7
   
   <Will>                   write LIDAR driver 
 
-  <>                       write OBD interface driver
+  <Patrick>                write OBD interface driver
 
 
 
@@ -226,11 +226,24 @@ void wait(int);
 char inchar(void);
 void outchar(char);
 
+void transmit_string(char[]);
+void receive_string(char[], char);
+void transmit_char(char x);
+
 /* Global Variable declarations */
 char leftpb_flag	= 0;  // left pushbutton flag
 char rghtpb_flag	= 0;  // right pushbutton flag
 char prevleftpb = 0; // previous pushbutton states
 char prevrghtpb	= 0;
+
+#define TSIZE 81	// transmit buffer size (80 characters)
+char tbuf[TSIZE];	// SCI transmit display buffer
+char tin	= 0;	// SCI transmit display buffer IN pointer
+char tout	= 0;	// SCI transmit display buffer OUT pointer
+
+char rbuf[TSIZE];	// SCI recieve display buffer
+char rin	= 0;	// SCI receive display buffer IN pointer
+char rout	= 0;	// SCI receive display buffer OUT pointer
 
 char count = 0;
 short num = 0;
@@ -265,7 +278,9 @@ void  initializations(void)
   SCICR2 = 0x0C; //initialize SCI for program-driven operation
   DDRB   = 0x10; //set PB4 for output mode
   PORTB  = 0x10; //assert DTR pin on COM port
-         
+  SCICR2_RIE = 1;   //Need to set recieve interrupts on
+      
+
 /* Initialize the SPI to 6 Mbs */
   SPIBR  = 0x10; //see documentation for initialization  
   SPICR1 = 0x5D; //LSB out first
@@ -353,7 +368,7 @@ void main(void)
       print_digit(count);
 
       rghtLED = rghtLED ^ 1;
-
+      transmit_string("Test string!\n");
     }  
 
 
@@ -423,9 +438,22 @@ interrupt 15 void TIM_ISR(void)
 
 interrupt 20 void SCI_ISR(void)
 {
- 
-
-
+  int statusReg = 0;
+    //Ready for new data
+  
+  if(SCISR1_RDRF == 1) {
+  //Recieved character, put it in buffer
+    rbuf[rin] = SCIDRL;
+    rin = (rin + 1) % TSIZE;
+  }  
+  if(tin != tout){
+      while(!SCISR1_TDRE){ }
+      SCIDRL = tbuf[tout];
+      tout = (tout + 1) % TSIZE;
+  } else { 
+    SCICR2_SCTIE = 1; //Disable interrupts for now  
+  } 
+  statusReg = SCISR1; //Clear SCI register flags
 }
 
 
@@ -593,6 +621,26 @@ void wait(int n)
   int i;
   for (;n > 0; n--) {
     for (i = 2000; i > 0; i--);
+  }
+}
+
+void transmit_string(char str[]){
+  int i = 0;
+  while(*(str+i) != 0) { //Load string into buffer
+    tbuf[tin] = (*(str+i));
+    tin = (tin + 1) % TSIZE;
+    i++;
+  }
+  //Enable interrupts
+  SCICR2_SCTIE = 1;
+}
+
+void receive_string(char str[],char strlen) {
+  int i = 0;
+  while(i <= strlen) {
+    str[i] = rbuf[rout];
+    rout = (rout + 1) % TSIZE;
+    i++;
   }
 }
 
