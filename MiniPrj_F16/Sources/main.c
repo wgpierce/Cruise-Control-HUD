@@ -344,9 +344,8 @@ void main(void)
   DisableInterrupts
 	initializations(); 		  			 		  		
 	EnableInterrupts;
-
+	
   for(;;) {
-      
     if (++counter % 50 == 0) {
       num++;
     }
@@ -368,10 +367,7 @@ void main(void)
       print_digit(count);
 
       rghtLED = rghtLED ^ 1;
-      transmit_string("Test string!\n");
     }  
-
-
 
     }
      
@@ -387,7 +383,7 @@ interrupt 7 void RTI_ISR(void)
 { 
   //Debounce buttons
   //Note this asserts the button flag upon pushing the button down
-  char currLeft = leftPB;
+/*  char currLeft = leftPB;
   char currRght = rghtPB;
   
   if (prevleftpb == 1) {
@@ -405,7 +401,7 @@ interrupt 7 void RTI_ISR(void)
   //set last states
   prevrghtpb = currRght;
   prevleftpb = currLeft;
-  
+  */
   // clear RTI interrupt flag
 	CRGFLG = CRGFLG | 0x80;
 }
@@ -419,7 +415,7 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   
-  print_number(num);
+//  print_number(num);
 
   
   // clear TIM CH 7 interrupt flag 
@@ -445,14 +441,16 @@ interrupt 20 void SCI_ISR(void)
   //Recieved character, put it in buffer
     rbuf[rin] = SCIDRL;
     rin = (rin + 1) % TSIZE;
-  }  
-  if(tin != tout){
-      while(!SCISR1_TDRE){ }
-      SCIDRL = tbuf[tout];
-      tout = (tout + 1) % TSIZE;
-  } else { 
-    SCICR2_SCTIE = 1; //Disable interrupts for now  
-  } 
+  }else{
+    //Need to transmit character      
+    if(tin != tout){
+        while(!SCISR1_TDRE){ } //Time to send out the next character
+        SCIDRL = tbuf[tout];
+        tout = (tout + 1) % TSIZE;
+    } else { 
+        SCICR2_SCTIE = 0; //Finished transmitting, disable interrupt 
+    }
+  }
   statusReg = SCISR1; //Clear SCI register flags
 }
 
@@ -632,6 +630,8 @@ void transmit_string(char str[]){
     i++;
   }
   //Enable interrupts
+    //tbuf[tin] = 0x00;//Insert end character
+    //tin = (tin + 1) % TSIZE;
   SCICR2_SCTIE = 1;
 }
 
