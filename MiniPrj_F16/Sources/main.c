@@ -4,7 +4,7 @@
 ***********************************************************************
  Section 1 	   			 		  			 		  		
  
- Team ID: < ? >
+ Team ID: 01
 
  Project Name: Cruise Control HUD
 
@@ -113,6 +113,10 @@ Section 6
   Nov 12  Will      finished multidigit operation and
                     adjusted timing parameters for LED driver
   
+  Nov 18  Will      Changed LED driver to not use a delay
+                    wrote rudimentary LIDAR driver            
+                    
+  
           Tyler
 		  
 		      Pat
@@ -129,8 +133,9 @@ Section 7
   
   Person to do this task : Tasks to be done 
   -----------------------------------------
+  <Will>                   write proper pinouts
   
-  <Will>                   write LIDAR driver 
+  <Will>                   write low pass filter in software for LIDAR
 
   <Patrick>                write OBD interface driver
 
@@ -160,19 +165,23 @@ Section 8
 
 
 /* Serial-to-parallel shift register controls */  
-#define RCLK PTT_PTT2
-#define SRCLR_N PTT_PTT3
+#define RCLK PTM_PTM1
+#define SRCLR_N PTM_PTM0
 
-/* Docking Board LED bit selectors */
-#define leftLED PTT_PTT1
-#define rghtLED PTT_PTT0
+/* Docking Board LED pin selectors */
+//#define leftLED PTT_PTT1
+//#define rghtLED PTT_PTT0
 
 /* Pushbutton pin selectors */
 #define leftPB PORTAD0_PTAD7
 #define rghtPB PORTAD0_PTAD6
 
+#define LIDAR_trigger_N PTT_PTT3
+#define LED_down PTT_PTT2
+#define LED_dash PTT_PTT1
+#define LED_up   PTT_PTT0
 
-/* END PORT DELCARATIONS */
+#define LIDAR_PWM ATDDR0H
 
 /* LED position select masks */
 
@@ -184,6 +193,8 @@ Section 8
 #define DIGIT1 0b10111111
 #define DIGIT2 0b11011111
 #define DIGIT3 0b11101111
+
+/* END PORT DELCARATIONS */
 
 /* Manual LED decoding, based on abel file
                 A B C D E F G DP
@@ -215,12 +226,18 @@ Section 8
 
 
 /* All functions after main declared here */
+//LED-related functions
 void LED_wait(void);
 void shift_out(char);
 void send_byte(char);
 void print_digit(char);
 void select_disp(char);
-void print_number(short);
+void print_number(unsigned short);
+
+//LIDAR-related functions
+unsigned char get_LIDAR(void);
+void sample_LIDAR(void);
+
 
 void wait(int);
 char inchar(void);
@@ -233,7 +250,7 @@ void transmit_char(char x);
 /* Global Variable declarations */
 char leftpb_flag	= 0;  // left pushbutton flag
 char rghtpb_flag	= 0;  // right pushbutton flag
-char prevleftpb = 0; // previous pushbutton states
+char prevleftpb = 0;    // previous pushbutton states
 char prevrghtpb	= 0;
 
 #define TSIZE 81	// transmit buffer size (80 characters)
@@ -245,9 +262,13 @@ char rbuf[TSIZE];	// SCI recieve display buffer
 char rin	= 0;	// SCI receive display buffer IN pointer
 char rout	= 0;	// SCI receive display buffer OUT pointer
 
-char count = 0;
 short num = 0;
 long counter = 0;
+
+#define COUNT_LIMIT 1000
+unsigned short count = 0;
+unsigned long distance_total = 0;
+unsigned short distance = 0;
 
 char cur_digit = 0;
 
@@ -290,34 +311,44 @@ void  initializations(void)
   RTICTL = 0x48; //value pulled from timing excel sheet
   CRGINT_RTIE = 1;  //enable/reset RTI
   
-/* Initialize TIM Ch 7 (TC7) for periodic interrupts at 50 Hz = every 20 ms */
-  
-   TSCR1 = 0x80; //enable timer
-   TSCR2 = 0x0E; //set prescale to 64
-   TIOS =  0x80; //set ch7 for output compare
-   TIE =   0x80; //enable ch7 interrupt
-   TC7 =   7500; //trigger value for 50ms interrupts                    
-   //TC7 = (24E6 / 64) / x Hz 	   			 		  			 		  		
-                 //the value here determines the refresh rate of the LEDs
-                 //50Hz is the experimental minumum for the LED refresh 
-                 //rate to not be noticeable to the human eye
-                 
-                 //Note that the longer this is, the less time
-                 //other parts of the program have to run
+/* Initialize TIM Ch 7 (TC7) for periodic interrupts at 50 Hz for each 
+    7-segment display = every 5 ms */
+    
+  TSCR1 = 0x80; //enable timer
+  TSCR2 = 0x0E; //set prescale to 64
+  TIOS =  0x80; //set ch7 for output compare
+  TIE =   0x80; //enable ch7 interrupt
+  TC7 =   1875; //trigger value for 50ms interrupts for each LED 
+  //TC7 = (24E6 / 64) / x Hz 	   			 		  			 		  		
+                //the value here determines the refresh rate of the LEDs
+                //50Hz is the experimental minumum for the LED refresh 
+                //rate to not be noticeable to the human eye
+               
+                //Note that the longer this is, the less time
+                //other parts of the program have to run
 
 
 /* Initialize digital I/O port pins */
 
 /* PORT INITIALIZATIONS */
-
-
+  /* Initialize PWM  */
+  
+  
+  /*  Initialize ATD   */
+  ATDCTL2 = 0x80; //normal program driven operation
+  ATDCTL3 = 0x08; //sample only channel 0, non-FIFO, non-frozen
+  //ATDCTL4 = 0xE0 | ATDCTL4; //8 bit resolution, use nominal scalar values
+  ATDCTL4 = 0xFF;
+            //sample for 8 conversion length periods
+            
   //  Initialize Port AD pins 6 and 7 for use as digital inputs
   DDRAD  = 0x00; //program port AD for input mode
   ATDDIEN= 0xC0; //program PAD7 and PAD6 pins as digital inputs
      
   DDRT   = 0xFF; //set port T as output
 
-
+  DDRM = DDRM | 0x03; //set port M pins as output
+  
   
 /* END PORT INITIALIZATIONS */
 
@@ -329,7 +360,8 @@ void  initializations(void)
   SRCLR_N = 0;   //initially clear LED
   SRCLR_N = 1;
   
-  
+  //turn on LIDAR for continuous measurement
+  LIDAR_trigger_N = 0;
   	      
 }
 
@@ -346,30 +378,30 @@ void main(void)
 	EnableInterrupts;
 	
   for(;;) {
-    if (++counter % 50 == 0) {
+    /*  
+    if (++counter % 50000 == 0) {
       num++;
     }
-    
+    */
     
     if (leftpb_flag) {
       //update display for each
       leftpb_flag = 0; 
-      count = (char)((count + 1) % 10);
-      print_digit(count);
-
-      leftLED = leftLED ^ 1;
+      LED_down = 1;
+      LED_up   = 1;
+      LED_dash = 1;
+      
+      //count = (char)((count + 1) % 10);
+      //print_digit(count);
 
     }
 
     if (rghtpb_flag) {
       rghtpb_flag = 0;
       
-      print_digit(count);
-
-      rghtLED = rghtLED ^ 1;
-    }  
-
-    }
+    //  rghtLED = rghtLED ^ 1;
+    } 
+  }
      
 }
 
@@ -402,6 +434,8 @@ interrupt 7 void RTI_ISR(void)
   prevrghtpb = currRght;
   prevleftpb = currLeft;
   */
+  
+  sample_LIDAR();
   // clear RTI interrupt flag
 	CRGFLG = CRGFLG | 0x80;
 }
@@ -413,9 +447,8 @@ interrupt 7 void RTI_ISR(void)
 */
 
 interrupt 15 void TIM_ISR(void)
-{
-  
-//  print_number(num);
+{  
+  print_number(distance);
 
   
   // clear TIM CH 7 interrupt flag 
@@ -457,11 +490,13 @@ interrupt 20 void SCI_ISR(void)
 
 /*
 ***********************************************************************
-  short_wait: Delay for approx .9 ms
+  short_wait: Delay for approx .7 ms
   long enough to display a 7-segment
   
   the loop limit in this function determines the
   brightness of the LEDs
+  
+  No longer used since it takes up unnecessary processing time
 ***********************************************************************
 */
 
@@ -581,16 +616,26 @@ void select_disp(char cur_digit)
 
 /*
 *********************************************************************** 
-  print_number: displays a binary encoded (non-BCD) number on the
-                LED display
+  print_number: displays one digit of a binary encoded (non-BCD) 
+                number on the LED display
 ***********************************************************************
 */
 
-void print_number(short x)
+void print_number(unsigned short x)
 {
   char i = 0;
   short exp = 10;
   short last_exp = 1;
+  
+  cur_digit = (char)((cur_digit + 1) % 4);
+  
+  for (; i < cur_digit; i++, last_exp = exp, exp *= 10);
+  select_disp(cur_digit);
+  
+  print_digit((char)((x % exp) / last_exp));
+  
+    
+  /*
   for (; i < 4; i++, exp *= 10) {
     select_disp(i);
     //use modulo to cut off upper values 
@@ -600,11 +645,43 @@ void print_number(short x)
     
     last_exp = exp;
   }
-  
+  //no need to deselect now since each 7-segment displays until the
+  //next one is displayed
   select_disp(-1);
-  
+  */
 }
 
+/*
+*********************************************************************** 
+  get_LIDAR: triggers ATD AN0 and reads value from that as the LIDAR
+             value
+***********************************************************************
+*/
+
+unsigned char get_LIDAR() 
+{
+  //note LIDAR is set to continuously read,
+  //so no need to activate it  
+  ATDCTL5 = 0x00;
+  while (ATDSTAT0_SCF == 0);  
+  return LIDAR_PWM;  
+}
+
+void sample_LIDAR(void)
+{
+  //average the LIDAR value, effectively low-pass filtering it  
+  //TODO: write actual low pass filter
+  count = (short)((count + 1) % COUNT_LIMIT);
+  distance_total += get_LIDAR();
+  
+  if (count == 0) {
+    distance = (short)(distance_total / COUNT_LIMIT);
+    distance_total = 0;
+  }
+  
+  
+  
+}
 
 /*
 *********************************************************************** 
