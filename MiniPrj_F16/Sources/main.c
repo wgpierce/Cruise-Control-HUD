@@ -399,8 +399,8 @@ void main(void)
     }
 
     if(search_buffer(responseByte, &searchVal)){
-      if(((searchVal+1) % TSIZE) < rin){ //Make sure we'ver received the second byte
-        currSpeed = rbuf[searchVal+1]; //Get byte after response byte
+      if((((searchVal+1) % TSIZE) < rin) || ((rout > rin) && (searchVal+1 < rin+TSIZE))){ //Make sure we'ver received the second byte
+        currSpeed = rbuf[(searchVal+1) % TSIZE]; //Get byte after response byte
         clear_buffer();
         speedRequested = 0;
       }
@@ -751,7 +751,7 @@ char search_buffer(char str[], char *returnVal){
         return 1;
       }
     }
-    i++;
+    i = (i + 1) % TSIZE;
   }
   return 0;
 }
