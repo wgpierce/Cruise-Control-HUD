@@ -238,14 +238,23 @@ void print_number(unsigned short);
 unsigned char get_LIDAR(void);
 void sample_LIDAR(void);
 
-
+//Debugging & Utility functions
 void wait(int);
 char inchar(void);
 void outchar(char);
 
+//SCI-related functions
 void transmit_string(char[]);
 void receive_string(char[], char);
 void transmit_char(char x);
+char search_buffer(char str[], char *returnVal);
+void clear_buffer(void);
+void wait_for_response(char numBytes);
+
+
+//OBD board-related functions
+void initialize_OBD(void);
+void request_speed(void);
 
 /* Global Variable declarations */
 char leftpb_flag	= 0;  // left pushbutton flag
@@ -261,6 +270,11 @@ char tout	= 0;	// SCI transmit display buffer OUT pointer
 char rbuf[TSIZE];	// SCI recieve display buffer
 char rin	= 0;	// SCI receive display buffer IN pointer
 char rout	= 0;	// SCI receive display buffer OUT pointer
+
+char currSpeed = 0; //Current speed value
+char speedRequested = 0;
+char responseByte[] = {0x1D, 0x00}; //Response byte of the obd board
+char searchVal = 0;
 
 short num = 0;
 long counter = 0;
@@ -376,31 +390,22 @@ void main(void)
   DisableInterrupts
 	initializations(); 		  			 		  		
 	EnableInterrupts;
-	
+  initialize_OBD();	
   for(;;) {
-    /*  
-    if (++counter % 50000 == 0) {
-      num++;
-    }
-    */
-    
-    if (leftpb_flag) {
-      //update display for each
-      leftpb_flag = 0; 
-      LED_down = 1;
-      LED_up   = 1;
-      LED_dash = 1;
-      
-      //count = (char)((count + 1) % 10);
-      //print_digit(count);
 
+    if(!speedRequested){ //If we've gotten the speed, time to ask for it again
+    request_speed();
+    speedRequested = 1;
     }
 
-    if (rghtpb_flag) {
-      rghtpb_flag = 0;
-      
-    //  rghtLED = rghtLED ^ 1;
-    } 
+    if(search_buffer(responseByte, &searchVal)){
+      if(((searchVal+1) % TSIZE) < rin){ //Make sure we'ver received the second byte
+        currSpeed = rbuf[searchVal+1]; //Get byte after response byte
+        clear_buffer();
+        speedRequested = 0;
+      }
+    }
+
   }
      
 }
@@ -699,6 +704,7 @@ void wait(int n)
   }
 }
 
+//Places string to transmit into the buffer and sets transmit interrupt
 void transmit_string(char str[]){
   int i = 0;
   while(*(str+i) != 0) { //Load string into buffer
@@ -712,13 +718,66 @@ void transmit_string(char str[]){
   SCICR2_SCTIE = 1;
 }
 
+//Reads string from buffer into memory location
 void receive_string(char str[],char strlen) {
   int i = 0;
-  while(i <= strlen) {
+  while(i < strlen) {
     str[i] = rbuf[rout];
     rout = (rout + 1) % TSIZE;
     i++;
   }
+  //str[i] = 0x00; //Denote end of string
+}
+
+//Waits for a response of a specified length
+void wait_for_response(char numBytes){
+  while(rin < rout + numBytes){};
+}
+//Clears circular buffer
+void clear_buffer(){
+  rout = rin;
+}
+
+//Searches buffer for a string
+char search_buffer(char str[], char *returnVal){
+  char i = rout;
+  char currentStrVal = 0;
+  while(i != rin){
+    if(rbuf[i] == str[currentStrVal]){
+      currentStrVal++;
+      if(str[currentStrVal] == 0){
+        //Reached end of search string, found answer
+        *returnVal = i-currentStrVal+1;
+        return 1;
+      }
+    }
+    i++;
+  }
+  return 0;
+}
+
+//Initializes OBD board 
+void initialize_OBD(){
+  //Send atz
+  transmit_string("atz");
+  wait(1000);
+  clear_buffer(); //Responds with firmware no. don't need
+  //Send atsp0
+  transmit_string("atsp0");
+  wait(1000);
+  clear_buffer();
+  //Wait for "OK" 
+}
+
+//Requests speed
+void request_speed(){
+  char outstring[3];
+  outstring[0] = 0x01;
+  outstring[1] = 0x0D;
+  outstring[2] = 0x00; //End of string
+  transmit_string(outstring);  
+//Send 01 0D
+//Wait for response
 }
 
 /*
