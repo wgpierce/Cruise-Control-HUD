@@ -114,8 +114,17 @@ Section 6
                     adjusted timing parameters for LED driver
   
   Nov 18  Will      Changed LED driver to not use a delay
-                    wrote rudimentary LIDAR driver            
-                    
+                    wrote rudimentary LIDAR driver 
+  
+  Nov 30  Will      (PCB now made and soldered)
+                    fixed many port declarations
+                    tested LED up/down/dash
+                    disable MISO in SPI for use as GPIO pin
+                    set slave select as input to prevent shorting
+                    double-buffer LEDs (shift out 2 digits at a time)
+                    reverse digit display order                             
+                    invert polarities for the parts that are actually on the board
+                    attempt software low-pass filter
   
           Tyler
 		  
@@ -133,13 +142,12 @@ Section 7
   
   Person to do this task : Tasks to be done 
   -----------------------------------------
-  <Will>                   write proper pinouts
   
   <Will>                   write low pass filter in software for LIDAR
 
   <Patrick>                write OBD interface driver
 
-
+  <Tyler>                  documentation
 
 ************************************************************************
 Section 8
@@ -165,36 +173,37 @@ Section 8
 
 
 /* Serial-to-parallel shift register controls */  
-#define RCLK PTM_PTM1
-#define SRCLR_N PTM_PTM0
 
-/* Docking Board LED pin selectors */
-//#define leftLED PTT_PTT1
-//#define rghtLED PTT_PTT0
+#define SR_MR_N PTAD_PTAD4   //shift register master reset
+#define SR_HCLK PTM_PTM5 //shift register clock input
+#define SR_IN   PTM_PTM4 //shift register serial input
+#define SR_OE_N PTM_PTM2 //shift register output enable
+                           //disable MISO for this
 
-/* Pushbutton pin selectors */
-#define leftPB PORTAD0_PTAD7
-#define rghtPB PORTAD0_PTAD6
+#define SR_TCLK PTM_PTM1 //storage register clock input
+                           //disable slave select (SS) and set
+                           //to input to prevent shorting
+                           //because double counted on the
+                           //schematic
 
 #define LIDAR_trigger_N PTT_PTT3
-#define LED_down PTT_PTT2
-#define LED_dash PTT_PTT1
-#define LED_up   PTT_PTT0
+#define LED_down_N PTT_PTT2
+#define LED_dash_N PTT_PTT1
+#define LED_up_N   PTT_PTT0
 
 #define LIDAR_PWM ATDDR0H
 
 /* LED position select masks */
 
-//OR PTT with this one
-#define D_NONE 0xF0
+//AND PTT with this one
+#define D_NONE 0x0F
 
-//AND PTT with these
-#define DIGIT0 0b01111111
-#define DIGIT1 0b10111111
-#define DIGIT2 0b11011111
-#define DIGIT3 0b11101111
+//OR PTT with these
+#define DIGIT0 0b10000000
+#define DIGIT1 0b01000000
+#define DIGIT2 0b00100000
+#define DIGIT3 0b00010000
 
-/* END PORT DELCARATIONS */
 
 /* Manual LED decoding, based on abel file
                 A B C D E F G DP
@@ -224,6 +233,8 @@ Section 8
 #define NINE    0b11110110
 #define DECIMAL 0b00000001
 
+/* END PORT DELCARATIONS */
+
 
 /* All functions after main declared here */
 //LED-related functions
@@ -232,12 +243,11 @@ void shift_out(char);
 void send_byte(char);
 void print_digit(char);
 void select_disp(char);
-void print_number(unsigned short);
+void print_number(unsigned short, unsigned short);
 
 //LIDAR-related functions
 unsigned char get_LIDAR(void);
 void sample_LIDAR(void);
-
 
 void wait(int);
 char inchar(void);
@@ -262,16 +272,18 @@ char rbuf[TSIZE];	// SCI recieve display buffer
 char rin	= 0;	// SCI receive display buffer IN pointer
 char rout	= 0;	// SCI receive display buffer OUT pointer
 
+//LIDAR variables
+unsigned int distance;
+#define BETA 4
 
-char count = 0;
-short num = 0;
-long counter = 0;
+unsigned char new_data;
+unsigned int smooth_dist = 0;
 
-#define COUNT_LIMIT 1000
-unsigned short count = 0;
-unsigned long distance_total = 0;
-unsigned short distance = 0;
+#define COUNT_LIMIT 100
+int dist_count = 0;
 
+//LED state variable
+#define NUM_DIGITS 4
 char cur_digit = 0;
 
  	   		
@@ -306,9 +318,11 @@ void  initializations(void)
 
 /* Initialize the SPI to 6 Mbs */
   SPIBR  = 0x10; //see documentation for initialization  
-  SPICR1 = 0x5D; //LSB out first
-  SPICR2 = 0x00; //normal operation
-  
+  SPICR1 = 0b01011101; //LSB out first
+  SPICR2 = 0b00001001; //SS not used
+                 //enable bidirectional mode
+                 //and so disable MISO                 
+    
 /* Initialize RTI for 2.048 ms interrupt rate */	
   RTICTL = 0x48; //value pulled from timing excel sheet
   CRGINT_RTIE = 1;  //enable/reset RTI
@@ -339,17 +353,17 @@ void  initializations(void)
   /*  Initialize ATD   */
   ATDCTL2 = 0x80; //normal program driven operation
   ATDCTL3 = 0x08; //sample only channel 0, non-FIFO, non-frozen
-  //ATDCTL4 = 0xE0 | ATDCTL4; //8 bit resolution, use nominal scalar values
-  ATDCTL4 = 0xFF;
-            //sample for 8 conversion length periods
+  ATDCTL4 = 0x80 | ATDCTL4; //8 bit resolution, use nominal scalar values
             
   //  Initialize Port AD pins 6 and 7 for use as digital inputs
-  DDRAD  = 0x00; //program port AD for input mode
-  ATDDIEN= 0xC0; //program PAD7 and PAD6 pins as digital inputs
+  DDRAD  = 0x10; //program port AD pin 4 for output (SR_MR_N)     
+  ATDDIEN= 0x00; //program PAD7 and PAD6 pins as digital inputs
      
   DDRT   = 0xFF; //set port T as output
 
-  DDRM = DDRM | 0x03; //set port M pins as output
+  DDRM   = 0xF7; //set port M pins as output
+                 //set slave select (SS) as input and disabled
+                 //set MISO pin as output
   
   
 /* END PORT INITIALIZATIONS */
@@ -357,13 +371,22 @@ void  initializations(void)
 
 /* Initialize states of peripheral devices */   
   
-  PTT = PTT | D_NONE;  //LED display to display digit 0
+  PTT = PTT & D_NONE;  //LED display to display digit 0
  
-  SRCLR_N = 0;   //initially clear LED
-  SRCLR_N = 1;
+  SR_OE_N = 1;
+  SR_OE_N = 0;   //enable output
   
+  SR_MR_N = 0;
+  SR_MR_N = 1;   //disable reset
+                 
+    
   //turn on LIDAR for continuous measurement
   LIDAR_trigger_N = 0;
+  
+  //Turn lights off initially
+  LED_down_N = 1;
+  LED_dash_N = 1;
+  LED_up_N   = 1; 
   	      
 }
 
@@ -380,18 +403,11 @@ void main(void)
 	EnableInterrupts;
 
   for(;;) {
-    /*  
-    if (++counter % 50000 == 0) {
-      num++;
-    }
-    */
-    
+
     if (leftpb_flag) {
       //update display for each
       leftpb_flag = 0; 
-      LED_down = 1;
-      LED_up   = 1;
-      LED_dash = 1;
+
       
       //count = (char)((count + 1) % 10);
       //print_digit(count);
@@ -401,7 +417,6 @@ void main(void)
     if (rghtpb_flag) {
       rghtpb_flag = 0;
       
-      rghtLED = rghtLED ^ 1;
       transmit_string("Test string!\n");
     }  
 
@@ -417,6 +432,7 @@ void main(void)
 
 interrupt 7 void RTI_ISR(void) 
 { 
+
   //Debounce buttons
   //Note this asserts the button flag upon pushing the button down
   char currLeft = leftPB;
@@ -437,6 +453,7 @@ interrupt 7 void RTI_ISR(void)
   //set last states
   prevrghtpb = currRght;
   prevleftpb = currLeft;
+
   
   sample_LIDAR();
   
@@ -454,9 +471,10 @@ interrupt 15 void TIM_ISR(void)
 {
   
   
-  print_number(distance);
+  //print_number(distance, distance);
+    print_number(2345,6789);
 
-  
+
   // clear TIM CH 7 interrupt flag 
  	TFLG1 = TFLG1 | 0x80; 
   
@@ -491,26 +509,6 @@ interrupt 20 void SCI_ISR(void)
   statusReg = SCISR1; //Clear SCI register flags
 }
 
-
-/*
-***********************************************************************
-  short_wait: Delay for approx .7 ms
-  long enough to display a 7-segment
-  
-  the loop limit in this function determines the
-  brightness of the LEDs
-  
-  No longer used since it takes up unnecessary processing time
-***********************************************************************
-*/
-
-void LED_wait()
-{
-  int i;
-  //any less than 10000 and the LEDs are dim
-  for (i = 0; i < 15000; i++);
-}
-
 /*
 ***********************************************************************
   shiftout: Transmits the character x to external shift 
@@ -522,7 +520,9 @@ void shift_out(char x)
 {  
   int i;
   while (SPISR_SPTEF == 0);
-  SPIDR = x;
+  //LEDs are active low, so invert logic
+  SPIDR = x ^ 0xFF;
+  //SPIDR = 0x00;
   for (i = 0; i < 15; i++);
 }
 
@@ -536,10 +536,10 @@ void send_byte(char x)
 {
   // shift out character
   shift_out(x);
-  // pulse LCD clock line low->high->low
-  RCLK = 0;
-  RCLK = 1;
-  RCLK = 0;
+  // pulse shift register clock line low->high->low
+  SR_TCLK = 0;
+  SR_TCLK = 1;
+  SR_TCLK = 0;
    
 }
 
@@ -596,21 +596,21 @@ void print_digit(char x)
 
 void select_disp(char cur_digit)
 {
-  PTT = PTT | D_NONE; //clear all select digits
+  PTT = PTT & D_NONE; //clear all select digits
   
   //select desired digit
   switch (cur_digit) {
     case 0:
-      PTT = PTT & DIGIT0;
+      PTT = PTT | DIGIT0;
       break;
     case 1:
-      PTT = PTT & DIGIT1;
+      PTT = PTT | DIGIT1;
       break;
     case 2:
-      PTT = PTT & DIGIT2;
+      PTT = PTT | DIGIT2;
       break;
     case 3:
-      PTT = PTT & DIGIT3;
+      PTT = PTT | DIGIT3;
       break;
     default:
       break;
@@ -620,39 +620,25 @@ void select_disp(char cur_digit)
 
 /*
 *********************************************************************** 
-  print_number: displays one digit of a binary encoded (non-BCD) 
-                number on the LED display
+  print_number: displays one digit of two binary encoded (non-BCD) 
+                numbers on the two LED displays
 ***********************************************************************
 */
 
-void print_number(unsigned short x)
+void print_number(unsigned short x, unsigned short y)
 {
   char i = 0;
   short exp = 10;
   short last_exp = 1;
   
-  cur_digit = (char)((cur_digit + 1) % 4);
+  cur_digit = (char)((cur_digit + 1) % NUM_DIGITS);
   
   for (; i < cur_digit; i++, last_exp = exp, exp *= 10);
-  select_disp(cur_digit);
+  select_disp(NUM_DIGITS - 1 - cur_digit); //mirror the digits
   
   print_digit((char)((x % exp) / last_exp));
+  print_digit((char)((y % exp) / last_exp));
   
-    
-  /*
-  for (; i < 4; i++, exp *= 10) {
-    select_disp(i);
-    //use modulo to cut off upper values 
-    //use integer division to cut off lower values 
-    print_digit((char)((x % exp) / last_exp));
-    LED_wait(); //wait for a bit so it can be displayed
-    
-    last_exp = exp;
-  }
-  //no need to deselect now since each 7-segment displays until the
-  //next one is displayed
-  select_disp(-1);
-  */
 }
 
 /*
@@ -673,6 +659,23 @@ unsigned char get_LIDAR()
 
 void sample_LIDAR(void)
 {
+  
+  distance = get_LIDAR();
+  return;
+  
+  new_data = get_LIDAR();
+  smooth_dist = (smooth_dist << BETA) - smooth_dist;
+  smooth_dist += new_data;
+  smooth_dist >>= BETA; 
+  
+  if (++dist_count >= COUNT_LIMIT) {
+    dist_count = 0;
+    distance = smooth_dist;
+  }
+    
+  
+  /*
+  
   //average the LIDAR value, effectively low-pass filtering it  
   //TODO: write actual low pass filter
   count = (short)((count + 1) % COUNT_LIMIT);
@@ -682,7 +685,7 @@ void sample_LIDAR(void)
     distance = (short)(distance_total / COUNT_LIMIT);
     distance_total = 0;
   }
-  
+  */
   
   
 }
