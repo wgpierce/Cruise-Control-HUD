@@ -266,6 +266,8 @@ void wait_for_response(char numBytes);
 //OBD board-related functions
 void initialize_OBD(void);
 void request_speed(void);
+char parse_ascii_val(char location);
+char ascii_to_hex(char input);
 
 /* Global Variable declarations */
 char leftpb_flag	= 0;  // left pushbutton flag
@@ -282,7 +284,12 @@ char rbuf[TSIZE];	// SCI recieve display buffer
 char rin	= 0;	// SCI receive display buffer IN pointer
 char rout	= 0;	// SCI receive display buffer OUT pointer
 
-<<<<<<< HEAD
+//SCI communication global variables
+unsigned char currSpeed = 0; //Current speed value
+char speedRequested = 0;
+char responseByte[] = "41 0D "; //Response byte of the obd board
+char searchVal = 0;
+
 //LIDAR variables
 unsigned int distance;
 #define BETA 4
@@ -421,14 +428,18 @@ void main(void)
   initialize_OBD();	
   for(;;) {
 
+
     if(!speedRequested){ //If we've gotten the speed, time to ask for it again
-    request_speed();
-    speedRequested = 1;
+      if(search_buffer(">", NULL)){ //If it's ready for a new request
+        request_speed();
+        speedRequested = 1;
+      }
     }
 
     if(search_buffer(responseByte, &searchVal)){
-      if((((searchVal+1) % TSIZE) < rin) || ((rout > rin) && (searchVal+1 < rin+TSIZE))){ //Make sure we'ver received the second byte
-        currSpeed = rbuf[(searchVal+1) % TSIZE]; //Get byte after response byte
+	  //Make sure we've received the whole message
+      if((((searchVal+8) % TSIZE) < rin) || ((rout > rin) && (searchVal+8 < rin+TSIZE))){ 
+        currSpeed = parse_ascii_val(searchVal+6); //Get byte after response byte
         clear_buffer();
         speedRequested = 0;
       }
@@ -461,7 +472,7 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   //print_number(distance, distance);
-  print_number(2345,6789);
+  print_number(currSpeed,6789);
 
 
   // clear TIM CH 7 interrupt flag 
@@ -746,27 +757,54 @@ char search_buffer(char str[], char *returnVal){
 }
 
 //Initializes OBD board 
+//Initializes OBD board 
 void initialize_OBD(){
   //Send atz
-  transmit_string("atz");
-  wait(1000);
-  clear_buffer(); //Responds with firmware no. don't need
+  transmit_string("atz\r");
+  wait(5000);
+  clear_buffer(); //Responds with firmware no.; Don't need
   //Send atsp0
-  transmit_string("atsp0");
-  wait(1000);
+  transmit_string("atsp0\r");
+  wait(5000);//Responds with "OK"
   clear_buffer();
-  //Wait for "OK" 
+  //Wait for "OK"
+  request_speed();
+  ///wait(10000); 
 }
 
 //Requests speed
 void request_speed(){
-  char outstring[3];
-  outstring[0] = 0x01;
-  outstring[1] = 0x0D;
-  outstring[2] = 0x00; //End of string
+  char outstring[] = "010D\r";
   transmit_string(outstring);  
 //Send 01 0D
 //Wait for response
+}
+
+char parse_ascii_val(char location) {
+  char value = ascii_to_hex(rbuf[location]) * 16; //High byte value
+  value = value + ascii_to_hex(rbuf[location+1]);//Low byte value
+  return value;
+}
+
+char ascii_to_hex(char input){
+ switch (input){
+  case '0': return 0;
+  case '1': return 1;
+  case '2': return 2;
+  case '3': return 3;
+  case '4': return 4;
+  case '5': return 5;
+  case '6': return 6;
+  case '7': return 7;
+  case '8': return 8;
+  case '9': return 9;
+  case 'A': return 10;
+  case 'B': return 11;
+  case 'C': return 12;
+  case 'D': return 13;
+  case 'E': return 14;
+  case 'F': return 15;
+ }
 }
 
 /*
