@@ -297,12 +297,6 @@ unsigned int distance;
 unsigned char new_data;
 unsigned int smooth_dist = 0;
 
-//ODB interfacing variables
-char currSpeed = 0; //Current speed value
-char speedRequested = 0;
-char responseByte[] = {0x1D, 0x00}; //Response byte of the obd board
-char searchVal = 0;
-
 #define COUNT_LIMIT 100
 int dist_count = 0;
 
