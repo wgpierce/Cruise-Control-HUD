@@ -1,3 +1,9 @@
 #CodeWarrior Files
 
 *.o
+
+MiniPrj_F16/*
+!MiniPrj_F16/Sources/
+!MiniPrj_F16/Sources/*
+!MiniPrj_F16/Sources/main.c
+
