@@ -125,6 +125,12 @@ Section 6
                     reverse digit display order                             
                     invert polarities for the parts that are actually on the board
                     attempt software low-pass filter
+ 
+ Dec 2              Integration party
+ 
+ Dec 2    Will      rewrote LIDAR driver to work now
+                    LIDAR is now based on ATD interrupts to measure for a set period of time
+ 
   
           Tyler
 		  
@@ -291,14 +297,24 @@ char responseByte[] = "41 0D "; //Response byte of the obd board
 char searchVal = 0;
 
 //LIDAR variables
-unsigned int distance;
-#define BETA 4
+ 
+//LIDAR has range 0 to 40 meters
+//with PWM rate of 10microseconds / cm
+//max time = 40000cm * 10 microseconds / .01 microseconds = .04seconds
+//therefore we should accumulate for
+//.04s / 10microseconds = 4000
 
-unsigned char new_data;
-unsigned int smooth_dist = 0;
+#define COUNT_LIMIT 4000
+int ATD_count = 0;
+int ATD_meas = 0;
+#define DIST_UPDATE_LIMIT 8
+int dist_update = 0;
+unsigned long dist_accum = 0;
 
-#define COUNT_LIMIT 100
-int dist_count = 0;
+int PWM_accum = 0;
+int new_meas = 0;
+
+unsigned int distance = 0;
 
 //LED state variable
 #define NUM_DIGITS 4
@@ -341,9 +357,9 @@ void  initializations(void)
                  //enable bidirectional mode
                  //and so disable MISO                 
     
-/* Initialize RTI for 2.048 ms interrupt rate */	
-  RTICTL = 0x48; //value pulled from timing excel sheet
-  CRGINT_RTIE = 1;  //enable/reset RTI
+/* Initialize RTI for 22Hz interrupt rate */	
+  RTICTL = 0x7F;
+  CRGINT_RTIE = 0;  //disable/reset RTI
   
 /* Initialize TIM Ch 7 (TC7) for periodic interrupts at 50 Hz for each 
     7-segment display = every 5 ms */
@@ -369,9 +385,19 @@ void  initializations(void)
   
   
   /*  Initialize ATD   */
-  ATDCTL2 = 0x80; //normal program driven operation
+  ATDCTL2 = 0xC0; //fast flag clear mode enabled
   ATDCTL3 = 0x08; //sample only channel 0, non-FIFO, non-frozen
-  ATDCTL4 = 0x80 | ATDCTL4; //8 bit resolution, use nominal scalar values
+  ATDCTL4 = 0xA0 | ATDCTL4; //8 bit resolution, 4 A/D clock cycles, use nominal scalar values
+                  //we will get interrupts every
+                  //
+                  // 2 + (sample time) + (2 + resolution)
+                  // ------------------------------------
+                  //              ATD Bus clock
+                  //
+                  //  = (2 + 4) + (2 + 8)
+                  //    -----------------  = 10 microseconds = out LIDAR PWM resolution
+                  //            2E6
+  
             
   //  Initialize Port AD pins 6 and 7 for use as digital inputs
   DDRAD  = 0x10; //program port AD pin 4 for output (SR_MR_N)     
@@ -398,7 +424,7 @@ void  initializations(void)
   SR_MR_N = 1;   //disable reset
                  
     
-  //turn on LIDAR for continuous measurement
+  //turn LIDAR on always
   LIDAR_trigger_N = 0;
   
   //Turn lights off initially
@@ -452,7 +478,8 @@ void main(void)
 interrupt 7 void RTI_ISR(void) 
 { 
   
-  sample_LIDAR();
+  
+  
   // clear RTI interrupt flag
 	CRGFLG = CRGFLG | 0x80;
 }
@@ -466,13 +493,52 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   //print_number(distance, distance);
-  print_number(currSpeed,6789);
+  print_number(currSpeed,distance);
 
+ if (++new_meas >= 13) {
+    //initiate LIDAR measurement
+    //measure every ~= 1/4 second
+
+    new_meas = 0;
+    
+    ATDCTL2 = 0b11000010; //turn on ATD interrupts   
+    ATDCTL5 = 0b00100000; //put into scan mode
+ }
+  
 
   // clear TIM CH 7 interrupt flag 
   TFLG1 = TFLG1 | 0x80;
 }
 
+interrupt 22 void ATD_ISR(void)
+{
+  ATD_meas = LIDAR_PWM;
+  
+  //get measurement
+  PWM_accum += ATD_meas > 100 ? 1 : 0;
+  
+  if (++ATD_count >= COUNT_LIMIT) {
+    //we are done with this measurement
+    
+    //take average
+    //record this measurement, do conversion
+    //distance = PWM_accum / 10; //distance is in cm    
+    dist_accum += PWM_accum / 10;
+    
+    if (++dist_update >= DIST_UPDATE_LIMIT) {
+      distance = (int)(dist_accum / DIST_UPDATE_LIMIT);
+      dist_accum = 0;      
+      dist_update = 0;
+    }
+    
+    
+    PWM_accum = 0;
+    ATD_count = 0;  
+    
+    ATDCTL2 = 0b11000000; //turn off ATD interrupts   
+    ATDCTL5 = 0b00000000; //turn off scan mode  
+  }
+}
 /*
 ***********************************************************************                       
   SCI interrupt service routine		 		  		
@@ -487,13 +553,13 @@ interrupt 20 void SCI_ISR(void)
   if(SCISR1_RDRF == 1) {
   //Recieved character, put it in buffer
     rbuf[rin] = SCIDRL;
-    rin = (rin + 1) % TSIZE;
+    rin = (char)((rin + 1) % TSIZE);
   }else{
     //Need to transmit character      
     if(tin != tout){
         while(!SCISR1_TDRE){ } //Time to send out the next character
         SCIDRL = tbuf[tout];
-        tout = (tout + 1) % TSIZE;
+        tout = (char)((tout + 1) % TSIZE);
     } else { 
         SCICR2_SCTIE = 0; //Finished transmitting, disable interrupt 
     }
@@ -652,33 +718,14 @@ unsigned char get_LIDAR()
 void sample_LIDAR(void)
 {
   
+  LIDAR_trigger_N = 0;
+
+
+
   distance = get_LIDAR();
   return;
-  
-  new_data = get_LIDAR();
-  smooth_dist = (smooth_dist << BETA) - smooth_dist;
-  smooth_dist += new_data;
-  smooth_dist >>= BETA; 
-  
-  if (++dist_count >= COUNT_LIMIT) {
-    dist_count = 0;
-    distance = smooth_dist;
-  }
-    
-  
-  /*
-  
-  //average the LIDAR value, effectively low-pass filtering it  
-  //TODO: write actual low pass filter
-  count = (short)((count + 1) % COUNT_LIMIT);
-  distance_total += get_LIDAR();
-  
-  if (count == 0) {
-    distance = (short)(distance_total / COUNT_LIMIT);
-    distance_total = 0;
-  }
-  */
-  
+ 
+
   
 }
 
@@ -703,7 +750,7 @@ void transmit_string(char str[]){
   int i = 0;
   while(*(str+i) != 0) { //Load string into buffer
     tbuf[tin] = (*(str+i));
-    tin = (tin + 1) % TSIZE;
+    tin = (char)((tin + 1) % TSIZE);
     i++;
   }
   //Enable interrupts
@@ -717,7 +764,7 @@ void receive_string(char str[],char strlen) {
   int i = 0;
   while(i < strlen) {
     str[i] = rbuf[rout];
-    rout = (rout + 1) % TSIZE;
+    rout = (char)((rout + 1) % TSIZE);
     i++;
   }
   //str[i] = 0x00; //Denote end of string
@@ -745,7 +792,7 @@ char search_buffer(char str[], char *returnVal){
         return 1;
       }
     }
-    i = (i + 1) % TSIZE;
+    i = (char)((i + 1) % TSIZE);
   }
   return 0;
 }
