@@ -699,35 +699,6 @@ void print_number(unsigned short x, unsigned short y)
   
 }
 
-/*
-*********************************************************************** 
-  get_LIDAR: triggers ATD AN0 and reads value from that as the LIDAR
-             value
-***********************************************************************
-*/
-
-unsigned char get_LIDAR() 
-{
-  //note LIDAR is set to continuously read,
-  //so no need to activate it  
-  ATDCTL5 = 0x00;
-  while (ATDSTAT0_SCF == 0);  
-  return LIDAR_PWM;  
-}
-
-void sample_LIDAR(void)
-{
-  
-  LIDAR_trigger_N = 0;
-
-
-
-  distance = get_LIDAR();
-  return;
- 
-
-  
-}
 
 /*
 *********************************************************************** 
