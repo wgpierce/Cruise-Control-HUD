@@ -132,7 +132,7 @@ Section 6
                     LIDAR is now based on ATD interrupts to measure for a set period of time
  
   
-          Tyler
+ Dec 2    Tyler     changed distance calculation to differential speed calculation
 		  
 		      Pat
 		  
@@ -315,6 +315,8 @@ int PWM_accum = 0;
 int new_meas = 0;
 
 unsigned int distance = 0;
+unsigned int prev_distance = 0;
+unsigned int velocity = 0;
 
 //LED state variable
 #define NUM_DIGITS 4
@@ -493,7 +495,7 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   //print_number(distance, distance);
-  print_number(currSpeed,distance);
+  print_number(currSpeed,velocity);
 
  if (++new_meas >= 13) {
     //initiate LIDAR measurement
@@ -529,6 +531,14 @@ interrupt 22 void ATD_ISR(void)
       distance = (int)(dist_accum / DIST_UPDATE_LIMIT);
       dist_accum = 0;      
       dist_update = 0;
+      //mod to do differential distance for now
+      if (distance > prev_distance){
+        velocity = distance - prev_distance;
+      }else{
+        velocity = prev_distance - distance;
+      }
+      prev_distance = distance;
+      velocity = (int)((long)velocity * 72 / 1000);
     }
     
     
