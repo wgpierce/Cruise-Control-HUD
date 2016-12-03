@@ -133,7 +133,9 @@ Section 6
  
   
  Dec 2    Tyler     changed distance calculation to differential speed calculation
-		  
+
+ Dec 3    Will      change LIDAR to only take measurement when we read a measurement
+ 		  
 		      Pat
 		  
 		  
@@ -149,10 +151,8 @@ Section 7
   Person to do this task : Tasks to be done 
   -----------------------------------------
   
-  <Will>                   write low pass filter in software for LIDAR
-
-  <Patrick>                write OBD interface driver
-
+  <>                       Add LED up/down/dash logic
+  
   <Tyler>                  documentation
 
 ************************************************************************
@@ -244,7 +244,6 @@ Section 8
 
 /* All functions after main declared here */
 //LED-related functions
-void LED_wait(void);
 void shift_out(char);
 void send_byte(char);
 void print_digit(char);
@@ -426,8 +425,8 @@ void  initializations(void)
   SR_MR_N = 1;   //disable reset
                  
     
-  //turn LIDAR on always
-  LIDAR_trigger_N = 0;
+  //turn LIDAR off for now
+  LIDAR_trigger_N = 1;
   
   //Turn lights off initially
   LED_down_N = 1;
@@ -502,7 +501,7 @@ interrupt 15 void TIM_ISR(void)
     //measure every ~= 1/4 second
 
     new_meas = 0;
-    
+    LIDAR_trigger_N = 1;
     ATDCTL2 = 0b11000010; //turn on ATD interrupts   
     ATDCTL5 = 0b00100000; //put into scan mode
  }
@@ -516,7 +515,7 @@ interrupt 22 void ATD_ISR(void)
 {
   ATD_meas = LIDAR_PWM;
   
-  //get measurement
+  //get measurement - essentially do pulse accumulation
   PWM_accum += ATD_meas > 100 ? 1 : 0;
   
   if (++ATD_count >= COUNT_LIMIT) {
@@ -544,7 +543,7 @@ interrupt 22 void ATD_ISR(void)
     
     PWM_accum = 0;
     ATD_count = 0;  
-    
+    LIDAR_trigger_N = 1;
     ATDCTL2 = 0b11000000; //turn off ATD interrupts   
     ATDCTL5 = 0b00000000; //turn off scan mode  
   }
