@@ -228,15 +228,15 @@ Section 8
 */
 
 #define ZERO    0b11111100
-#define ONE     0b01100000
+#define ONE     0b00001100
 #define TWO     0b11011010
-#define THREE   0b11110010
-#define FOUR    0b01100110
+#define THREE   0b10011110
+#define FOUR    0b00101110
 #define FIVE    0b10110110
-#define SIX     0b10111110
-#define SEVEN   0b11100000
+#define SIX     0b11110110
+#define SEVEN   0b00011100
 #define EIGHT   0b11111110
-#define NINE    0b11110110
+#define NINE    0b10111110
 #define DECIMAL 0b00000001
 
 /* END PORT DELCARATIONS */
@@ -316,6 +316,7 @@ int new_meas = 0;
 unsigned int distance = 0;
 unsigned int prev_distance = 0;
 unsigned int velocity = 0;
+char velDirection = 1;
 
 //LED state variable
 #define NUM_DIGITS 4
@@ -413,6 +414,22 @@ void  initializations(void)
   
 /* END PORT INITIALIZATIONS */
 
+/*Initialize PWM*/
+
+  MODRR = 0x07;
+  PWME = 0x07;
+  PWMPOL = 0x00;
+  PWMCTL = 0x00;
+  PWMCAE = 0x00;
+  PWMPER0 = 0xFF;
+  PWMPER1 = 0xFF;
+  PWMPER2 = 0xFF;
+  PWMDTY0 = 0x00;
+  PWMDTY1 = 0x00;
+  PWMDTY2 = 0x00;
+  PWMPRCLK = 0x00;
+  PWMCLK = 0x00;  
+
 
 /* Initialize states of peripheral devices */   
   
@@ -465,7 +482,25 @@ void main(void)
         speedRequested = 0;
       }
     }
-
+    if (velocity < 1){
+      PWMDTY0 = 0;
+      PWMDTY1 = 0xFF;
+      PWMDTY2 = 0;  
+    } else{
+      if (velDirection == 1){
+         //Slow Down; 2
+        PWMDTY2 = (velocity < 25 ? 10 * velocity : 255);
+        PWMDTY1 = 0;
+        PWMDTY0 = 0;
+      }else{
+        //Speed up; 0
+        PWMDTY0 = (velocity < 25 ? 10 * velocity : 255);
+        PWMDTY1 = 0;
+        PWMDTY2 = 0;
+      
+      }
+    }
+    
   }
      
 }
@@ -494,14 +529,14 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   //print_number(distance, distance);
-  print_number(currSpeed,velocity);
+  print_number(currSpeed,distance / 10);
 
  if (++new_meas >= 13) {
     //initiate LIDAR measurement
     //measure every ~= 1/4 second
 
     new_meas = 0;
-    LIDAR_trigger_N = 1;
+    LIDAR_trigger_N = 0;
     ATDCTL2 = 0b11000010; //turn on ATD interrupts   
     ATDCTL5 = 0b00100000; //put into scan mode
  }
@@ -532,8 +567,10 @@ interrupt 22 void ATD_ISR(void)
       dist_update = 0;
       //mod to do differential distance for now
       if (distance > prev_distance){
+        velDirection = -1;
         velocity = distance - prev_distance;
       }else{
+        velDirection = 1;
         velocity = prev_distance - distance;
       }
       prev_distance = distance;
@@ -701,7 +738,7 @@ void print_number(unsigned short x, unsigned short y)
   cur_digit = (char)((cur_digit + 1) % NUM_DIGITS);
   
   for (; i < cur_digit; i++, last_exp = exp, exp *= 10);
-  select_disp(NUM_DIGITS - 1 - cur_digit); //mirror the digits
+  select_disp(cur_digit); //mirror the digits
   
   print_digit((char)((x % exp) / last_exp));
   print_digit((char)((y % exp) / last_exp));
