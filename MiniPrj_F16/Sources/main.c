@@ -477,7 +477,9 @@ void main(void)
     if(search_buffer(responseByte, &searchVal)){
 	  //Make sure we've received the whole message
       if((((searchVal+8) % TSIZE) < rin) || ((rout > rin) && (searchVal+8 < rin+TSIZE))){ 
-        currSpeed = parse_ascii_val(searchVal+6); //Get byte after response byte
+        if(parse_ascii_val(searchVal+6) >= 0){
+		currSpeed = parse_ascii_val(searchVal+6);
+		} //Get byte after response byte
         clear_buffer();
         speedRequested = 0;
       }
@@ -863,6 +865,7 @@ char ascii_to_hex(char input){
   case 'E': return 14;
   case 'F': return 15;
  }
+ return -1;
 }
 
 /*
