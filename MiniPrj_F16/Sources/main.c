@@ -299,19 +299,20 @@ char searchVal = 0;
  
 //LIDAR has range 0 to 40 meters
 //with PWM rate of 10microseconds / cm
-//max time = 40000cm * 10 microseconds / .01 microseconds = .04seconds
+//max time = 4000cm * 10 microseconds / .01 microseconds = .04seconds
 //therefore we should accumulate for
 //.04s / 10microseconds = 4000
 
 #define COUNT_LIMIT 4000
-int ATD_count = 0;
-int ATD_meas = 0;
-#define DIST_UPDATE_LIMIT 8
+long int ATD_count = 0;
+long int ATD_meas = 0;
+#define DIST_UPDATE_LIMIT 16
 int dist_update = 0;
 unsigned long dist_accum = 0;
 
 int PWM_accum = 0;
 int new_meas = 0;
+char hasStarted = 0;
 
 unsigned int distance = 0;
 unsigned int prev_distance = 0;
@@ -389,14 +390,15 @@ void  initializations(void)
   /*  Initialize ATD   */
   ATDCTL2 = 0xC0; //fast flag clear mode enabled
   ATDCTL3 = 0x08; //sample only channel 0, non-FIFO, non-frozen
-  ATDCTL4 = 0xA0 | ATDCTL4; //8 bit resolution, 4 A/D clock cycles, use nominal scalar values
+  ATDCTL4 = 0b11000101;// | ATDCTL4; //8 bit resolution, 4 A/D clock cycles, use nominal scalar values
+            
                   //we will get interrupts every
                   //
                   // 2 + (sample time) + (2 + resolution)
                   // ------------------------------------
                   //              ATD Bus clock
                   //
-                  //  = (2 + 4) + (2 + 8)
+                  //  = (2 + 8) + (2 + 8)
                   //    -----------------  = 10 microseconds = out LIDAR PWM resolution
                   //            2E6
   
@@ -531,7 +533,7 @@ interrupt 7 void RTI_ISR(void)
 interrupt 15 void TIM_ISR(void)
 {
   //print_number(distance, distance);
-  print_number(currSpeed,distance / 10);
+  print_number(currSpeed,distance);
 
  if (++new_meas >= 13) {
     //initiate LIDAR measurement
@@ -552,22 +554,32 @@ interrupt 22 void ATD_ISR(void)
 {
   ATD_meas = LIDAR_PWM;
   
-  //get measurement - essentially do pulse accumulation
-  PWM_accum += ATD_meas > 100 ? 1 : 0;
+/*  if (ATD_meas < 50 && ! hasStarted){
+    return;
+  } else{
+    hasStarted = 1;
+  }
   
-  if (++ATD_count >= COUNT_LIMIT) {
-    //we are done with this measurement
-    
-    //take average
-    //record this measurement, do conversion
-    //distance = PWM_accum / 10; //distance is in cm    
-    dist_accum += PWM_accum / 10;
-    
-    if (++dist_update >= DIST_UPDATE_LIMIT) {
-      distance = (int)(dist_accum / DIST_UPDATE_LIMIT);
-      dist_accum = 0;      
-      dist_update = 0;
-      //mod to do differential distance for now
+  //get measurement - essentially do pulse accumulation
+  if (ATD_meas >= 50){
+    PWM_accum ++;
+  } else{ */
+  if (!hasStarted){
+    if(ATD_meas > 50){
+      hasStarted = 1;
+      PWM_accum++;
+    }
+  }else{
+    if(ATD_meas > 50){
+      PWM_accum++;
+    }else{
+    distance = PWM_accum;
+    PWM_accum = 0;
+    hasStarted = 0;
+    LIDAR_trigger_N = 1;
+    ATDCTL2 = 0b11000000; //turn off ATD interrupts   
+    ATDCTL5 = 0b00000000; //turn off scan mode  
+
       if (distance > prev_distance){
         velDirection = -1;
         velocity = distance - prev_distance;
@@ -577,14 +589,9 @@ interrupt 22 void ATD_ISR(void)
       }
       prev_distance = distance;
       velocity = (int)((long)velocity * 72 / 1000);
+
     }
     
-    
-    PWM_accum = 0;
-    ATD_count = 0;  
-    LIDAR_trigger_N = 1;
-    ATDCTL2 = 0b11000000; //turn off ATD interrupts   
-    ATDCTL5 = 0b00000000; //turn off scan mode  
   }
 }
 /*
