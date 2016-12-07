@@ -10,13 +10,15 @@
 
  Team Members:
 
-   - Team/Doc Leader: Patrick May      Signature: ______________________
+   - Team Leader: Patrick May            Signature: ______________________
    
-   - Software Leader: William Pierce   Signature: ______________________
+   - Software Leader: William Pierce     Signature: ______________________
 
-   - Interface Leader: < ? >     Signature: ______________________
+   - Interface Leader: Patrick May       Signature: ______________________
 
-   - Peripheral Leader: < ? >    Signature: ______________________
+   - Peripheral Leader: Patric May       Signature: ______________________
+   
+   - Documentation Leader: Tyler Carter  Signature: ______________________
 
 
  Academic Honesty Statement:  In signing above, we hereby certify that we 
@@ -41,13 +43,14 @@ Table of Contents
   TODO section                   7
   Code                           8
 
-Method od implementation is in separate word document
+Method of implementation is in separate word document
 
 ***********************************************************************
 Section 3
     
-  The objective of this Mini-Project is to .... < ? >
-
+  Cruise control HUD aims to help drivers by dynamically displaying
+  data about the car’s velocity, distance to oncoming cars, and
+  whether to slow down or speed up.
 
 ***********************************************************************
 Section 4
@@ -55,11 +58,11 @@ Section 4
  List of project-specific success criteria (functionality that will be
  demonstrated):
 
- 1.
+ 1. Interface with car via OBD
 
- 2.
+ 2. Interface with LIDAR's PWM function using on-board ATD
 
- 3.
+ 3. More Success
 
  4.
 
@@ -85,14 +88,6 @@ Section 5
    {
    
    }
- 
- * 
- 
- * 
- 
- * 
- 
-   
    
 ***********************************************************************
 Section 6
@@ -126,7 +121,7 @@ Section 6
                     invert polarities for the parts that are actually on the board
                     attempt software low-pass filter
  
- Dec 2              Integration party
+ Dec 2    Everyone  Integration party
  
  Dec 2    Will      rewrote LIDAR driver to work now
                     LIDAR is now based on ATD interrupts to measure for a set period of time
@@ -136,11 +131,10 @@ Section 6
 
  Dec 3    Will      change LIDAR to only take measurement when we read a measurement
  		  
-		      Pat
-		  
-		  
-		  
-		  
+		      Pat's Docs
+		      
+		      Tyler's Docs
+
 		  
 
 ***********************************************************************
@@ -151,10 +145,8 @@ Section 7
   Person to do this task : Tasks to be done 
   -----------------------------------------
   
-  <>                       Add LED up/down/dash logic
+  Done
   
-  <Tyler>                  documentation
-
 ************************************************************************
 Section 8
 */
@@ -267,7 +259,6 @@ char search_buffer(char str[], char *returnVal);
 void clear_buffer(void);
 void wait_for_response(char numBytes);
 
-
 //OBD board-related functions
 void initialize_OBD(void);
 void request_speed(void);
@@ -296,13 +287,13 @@ char responseByte[] = "41 0D "; //Response byte of the obd board
 char searchVal = 0;
 
 //LIDAR variables
+/*LIDAR has range 0 to 40 meters
+  with PWM rate of 10microseconds / cm
+  max time = 4000cm * 10 microseconds / .01 microseconds = .04seconds
+  therefore we should accumulate for
+  .04s / 10microseconds = 4000
+ */
  
-//LIDAR has range 0 to 40 meters
-//with PWM rate of 10microseconds / cm
-//max time = 4000cm * 10 microseconds / .01 microseconds = .04seconds
-//therefore we should accumulate for
-//.04s / 10microseconds = 4000
-
 #define COUNT_LIMIT 4000
 long int ATD_count = 0;
 long int ATD_meas = 0;
@@ -360,9 +351,9 @@ void  initializations(void)
                  //enable bidirectional mode
                  //and so disable MISO                 
     
-/* Initialize RTI for 22Hz interrupt rate */	
+/* Initialize RTI for 22Hz interrupt rate - unused */	
   RTICTL = 0x7F;
-  CRGINT_RTIE = 0;  //disable/reset RTI
+  CRGINT_RTIE = 0;  //disable RTI
   
 /* Initialize TIM Ch 7 (TC7) for periodic interrupts at 50 Hz for each 
     7-segment display = every 5 ms */
@@ -454,10 +445,10 @@ void  initializations(void)
   	      
 }
 
-	 		  			 		  		
+		  			 		  		
 /*	 		  			 		  		
 ***********************************************************************
-Main
+ Main
 ***********************************************************************
 */
 void main(void)
@@ -512,21 +503,23 @@ void main(void)
 /*
 ***********************************************************************                       
  RTI interrupt service routine: RTI_ISR
+ 
+ Unused.
 ************************************************************************
 */
 
 interrupt 7 void RTI_ISR(void) 
 { 
-  
-  
-  
   // clear RTI interrupt flag
 	CRGFLG = CRGFLG | 0x80;
 }
 
 /*
 ***********************************************************************                       
-  TIM interrupt service routine	  		
+  TIM interrupt service routine
+  
+  Trigger a print out of a new LED digit and initiates a new LIADR
+  measurement every ~1/4 of a second	  		
 ***********************************************************************
 */
 
@@ -550,29 +543,29 @@ interrupt 15 void TIM_ISR(void)
   TFLG1 = TFLG1 | 0x80;
 }
 
+/*
+***********************************************************************                       
+  ATD interrupt service routine
+  
+  Samples a reading from the LIDAR every 10 microseconds as 
+  calculated in the initializations until the LIDAR pulls the line
+  low again, without averaging now. After this, it turns the LIDAR
+  and the ATD interrupts themselves off. 	  		
+***********************************************************************
+*/
 interrupt 22 void ATD_ISR(void)
 {
   ATD_meas = LIDAR_PWM;
   
-/*  if (ATD_meas < 50 && ! hasStarted){
-    return;
-  } else{
-    hasStarted = 1;
-  }
-  
-  //get measurement - essentially do pulse accumulation
-  if (ATD_meas >= 50){
-    PWM_accum ++;
-  } else{ */
   if (!hasStarted){
     if(ATD_meas > 50){
       hasStarted = 1;
       PWM_accum++;
     }
-  }else{
+  } else{
     if(ATD_meas > 50){
       PWM_accum++;
-    }else{
+    } else{
     distance = PWM_accum;
     PWM_accum = 0;
     hasStarted = 0;
@@ -596,7 +589,10 @@ interrupt 22 void ATD_ISR(void)
 }
 /*
 ***********************************************************************                       
-  SCI interrupt service routine		 		  		
+  SCI interrupt service routine
+  
+  //Pat write stuff here
+  Handles communication with the car by		 		  		
 ***********************************************************************
 */
 
@@ -659,6 +655,7 @@ void send_byte(char x)
 /*
 *********************************************************************** 
   print_digit: writes character x to the LED
+               x is expected to be a deimal digit
 ***********************************************************************
 */
 
@@ -757,8 +754,9 @@ void print_number(unsigned short x, unsigned short y)
 
 /*
 *********************************************************************** 
-  wait: waits for approximately n milliseconds
-        note this can get interrupted, if not
+  wait: Waits for approximately n milliseconds
+        note this function is blocking and consumes CPU time
+        also note this can get interrupted, if not
         called from an interrupt
 ***********************************************************************
 */
@@ -771,8 +769,14 @@ void wait(int n)
   }
 }
 
-//Places string to transmit into the buffer and sets transmit interrupt
-void transmit_string(char str[]){
+/*
+*********************************************************************** 
+  transmit_string: Places string to transmit into the buffer and sets transmit interrupt
+***********************************************************************
+*/
+
+void transmit_string(char str[])
+{
   int i = 0;
   while(*(str+i) != 0) { //Load string into buffer
     tbuf[tin] = (*(str+i));
@@ -785,8 +789,14 @@ void transmit_string(char str[]){
   SCICR2_SCTIE = 1;
 }
 
-//Reads string from buffer into memory location
-void receive_string(char str[],char strlen) {
+ /*
+*********************************************************************** 
+  receive_string: Reads string from buffer into memory location
+***********************************************************************
+*/
+
+void receive_string(char str[],char strlen)
+{
   int i = 0;
   while(i < strlen) {
     str[i] = rbuf[rout];
@@ -796,17 +806,36 @@ void receive_string(char str[],char strlen) {
   //str[i] = 0x00; //Denote end of string
 }
 
-//Waits for a response of a specified length
-void wait_for_response(char numBytes){
+/*
+*********************************************************************** 
+  wait_for_response: Waits for a response of a specified length
+***********************************************************************
+*/
+
+void wait_for_response(char numBytes)
+{
   while(rin < rout + numBytes){};
 }
-//Clears circular buffer
-void clear_buffer(){
+
+/*
+*********************************************************************** 
+  clear_buffer: Clears circular buffer
+***********************************************************************
+*/
+
+void clear_buffer()
+{
   rout = rin;
 }
 
-//Searches buffer for a string
-char search_buffer(char str[], char *returnVal){
+/*
+*********************************************************************** 
+  search_buffer: Searches buffer for a string
+***********************************************************************
+*/
+
+char search_buffer(char str[], char *returnVal)
+{
   char i = rout;
   char currentStrVal = 0;
   while(i != rin){
@@ -823,9 +852,14 @@ char search_buffer(char str[], char *returnVal){
   return 0;
 }
 
-//Initializes OBD board 
-//Initializes OBD board 
-void initialize_OBD(){
+/*
+*********************************************************************** 
+  initialize_OBD: Initializes OBD board
+***********************************************************************
+*/
+
+void initialize_OBD()
+{
   //Send atz
   transmit_string("atz\r");
   wait(5000);
@@ -839,21 +873,41 @@ void initialize_OBD(){
   ///wait(10000); 
 }
 
-//Requests speed
-void request_speed(){
+/*
+*********************************************************************** 
+  request_speed: Requests speed
+***********************************************************************
+*/
+
+void request_speed()
+{
   char outstring[] = "010D\r";
   transmit_string(outstring);  
 //Send 01 0D
 //Wait for response
 }
 
-char parse_ascii_val(char location) {
+/*
+*********************************************************************** 
+  parse_ascii_val: Parses and ascii value byte by byte
+***********************************************************************
+*/
+
+char parse_ascii_val(char location)
+{
   char value = ascii_to_hex(rbuf[location]) * 16; //High byte value
   value = value + ascii_to_hex(rbuf[location+1]);//Low byte value
   return value;
 }
+/*
+*********************************************************************** 
+  ascii_to_hex: converts ascii hex to decimal value.
+                returns -1 if invalid (non ascii hex) value
+***********************************************************************
+*/
 
-char ascii_to_hex(char input){
+char ascii_to_hex(char input)
+{
  switch (input){
   case '0': return 0;
   case '1': return 1;

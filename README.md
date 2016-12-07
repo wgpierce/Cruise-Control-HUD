@@ -20,8 +20,19 @@ your projectFolder/Sources/ folder
 		
 ###Technologies used
 
+#### Hardware
+- MC9S12C32 microcontroller board
+- OBD to UART Cable
+- LIDAR
+- Custom PCB with power wired to OBD board
+- Shift Registers
+- 4x7-segment Displays
+- Printrbot Simple Metal
+
+#### Software
 - CodeWarrior
+	- USBMLT
 - Eagle
 - Autodesk Fusion
 
-See Documentation for hardware specific details
+See Documentation for more specific details
