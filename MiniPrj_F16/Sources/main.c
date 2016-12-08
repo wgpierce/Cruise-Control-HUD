@@ -282,9 +282,9 @@ char rout	= 0;	// SCI receive display buffer OUT pointer
 
 //SCI communication global variables
 unsigned char currSpeed = 0; //Current speed value
-char speedRequested = 0;
+char speedRequested = 0; //SCI communication state variable
 char responseByte[] = "41 0D "; //Response byte of the obd board
-char searchVal = 0;
+char searchVal = 0; //Speed response rbuf index
 
 //LIDAR variables
 /*LIDAR has range 0 to 40 meters
@@ -301,14 +301,14 @@ long int ATD_meas = 0;
 int dist_update = 0;
 unsigned long dist_accum = 0;
 
-int PWM_accum = 0;
-int new_meas = 0;
-char hasStarted = 0;
+int PWM_accum = 0;  //LIDAR pulse accumulation variable
+int new_meas = 0;  //LIDAR state variable
+char hasStarted = 0; //LIDAR reading state machine variable
 
-unsigned int distance = 0;
-unsigned int prev_distance = 0;
-unsigned int velocity = 0;
-char velDirection = 1;
+unsigned int distance = 0; //Distance reading
+unsigned int prev_distance = 0; //Previous reading, for velocity
+unsigned int velocity = 0; //Used for velocity LEDs
+char velDirection = 1; //Velocity sign bit
 
 //LED state variable
 #define NUM_DIGITS 4
@@ -456,7 +456,9 @@ void main(void)
   DisableInterrupts
 	initializations(); 		  			 		  		
 	EnableInterrupts;
-  initialize_OBD();	
+  //Have to initialize SCI interrupts to start comms with the OBD board
+  initialize_OBD();
+  	
   for(;;) {
 
 
@@ -590,8 +592,8 @@ interrupt 22 void ATD_ISR(void)
 ***********************************************************************                       
   SCI interrupt service routine
   
-  //Pat write stuff here
-  Handles communication with the car by		 		  		
+  Writes to the serial comm line if tx is available, reads value from
+  data register if data is recv'd. Reading takes precedence over writing.		 		  		
 ***********************************************************************
 */
 
@@ -880,10 +882,10 @@ void initialize_OBD()
 
 void request_speed()
 {
+  //01 - General Commands
+  //0D - Request speed from ECU (kmh)
   char outstring[] = "010D\r";
   transmit_string(outstring);  
-//Send 01 0D
-//Wait for response
 }
 
 /*
