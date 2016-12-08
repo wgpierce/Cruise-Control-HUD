@@ -185,9 +185,9 @@ Section 8
                            //schematic
 
 #define LIDAR_trigger_N PTT_PTT3
-#define LED_down_N PTT_PTT2
+#define LED_down_N PTT_PTT0
 #define LED_dash_N PTT_PTT1
-#define LED_up_N   PTT_PTT0
+#define LED_up_N   PTT_PTT2
 
 #define LIDAR_PWM ATDDR0H
 
@@ -471,7 +471,7 @@ void main(void)
 	  //Make sure we've received the whole message
       if((((searchVal+8) % TSIZE) < rin) || ((rout > rin) && (searchVal+8 < rin+TSIZE))){ 
         if(parse_ascii_val(searchVal+6) >= 0){
-		currSpeed = parse_ascii_val(searchVal+6);
+		      currSpeed = parse_ascii_val(searchVal+6) * 62 / 100;
 		} //Get byte after response byte
         clear_buffer();
         speedRequested = 0;
@@ -484,14 +484,14 @@ void main(void)
     } else{
       if (velDirection == 1){
          //Slow Down; 2
-        PWMDTY2 = (velocity < 25 ? 10 * velocity : 255);
-        PWMDTY1 = 0;
-        PWMDTY0 = 0;
-      }else{
-        //Speed up; 0
         PWMDTY0 = (velocity < 25 ? 10 * velocity : 255);
         PWMDTY1 = 0;
         PWMDTY2 = 0;
+      }else{
+        //Speed up; 0
+        PWMDTY2 = (velocity < 25 ? 10 * velocity : 255);
+        PWMDTY1 = 0;
+        PWMDTY0 = 0;
       
       }
     }
@@ -560,7 +560,6 @@ interrupt 22 void ATD_ISR(void)
   if (!hasStarted){
     if(ATD_meas > 50){
       hasStarted = 1;
-      PWM_accum++;
     }
   } else{
     if(ATD_meas > 50){
