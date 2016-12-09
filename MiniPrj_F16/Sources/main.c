@@ -10,17 +10,18 @@
 
  Team Members:
 
-   - Team Leader: Patrick May            Signature: ______________________
+   - Team Leader: Patrick May            Signature: Patrick Monte May
    
-   - Software Leader: William Pierce     Signature: ______________________
+   - Software Leader: William Pierce     Signature: William Pierce
 
-   - Interface Leader: Patrick May       Signature: ______________________
-
-   - Peripheral Leader: Patric May       Signature: ______________________
+   - SCI/OBD Integration: Patrick May    Signature: Patrick Monte May
    
-   - Documentation Leader: Tyler Carter  Signature: ______________________
-
-
+   - PCB Design: Patrick May             Signature: Patrick Monte May
+   
+   - LIDAR Integration: William Pierce   Signature: William Pierce
+   
+   - Documentation Leader: Tyler Carter  Signature: Tyler Carter
+   
  Academic Honesty Statement:  In signing above, we hereby certify that we 
  are the individuals who created this HC(S)12 source file and that we have
  not copied the work of any other student (past or present) while completing 
@@ -58,15 +59,15 @@ Section 4
  List of project-specific success criteria (functionality that will be
  demonstrated):
 
- 1. Interface with car via OBD
+ 1. Interface with ECU of car via OBD
 
  2. Interface with LIDAR's PWM function using on-board ATD
 
- 3. More Success
+ 3. Display speed and distance
 
- 4.
+ 4. Design enclsoures that allows reading during driving and protection
 
- 5.
+ 5. Process data and tell user whether to speed up or slow down
  
 ***********************************************************************
 Section 5
@@ -132,7 +133,7 @@ Section 6
  Dec 2    Tyler     changed distance calculation to differential speed calculation
 
  Dec 3    Will      change LIDAR to only take measurement when we read a measurement
- Dec 4    Tyler     Fixed LIDAR bug
+ Dec 5    Tyler/Pat Fixed LIDAR driver to measure distance based on LIDAR documentation 
  Dec 4    Patrick   Error checked SCI
  Dec 6    Patrick   Fixed LIDAR drivers
  Dec 7    Patrick   Added kph/mph conversion, updated docs		  
