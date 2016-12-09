@@ -111,8 +111,11 @@ Section 6
   
   Nov 18  Will      Changed LED driver to not use a delay
                     wrote rudimentary LIDAR driver 
+                    
   Nov 18   Patrick  Added serial comm drivers  
+  
   Nov 21   Patrick  Started OBD board drivers
+  
   Nov 30  Will      (PCB now made and soldered)
                     fixed many port declarations
                     tested LED up/down/dash
@@ -133,9 +136,13 @@ Section 6
  Dec 2    Tyler     changed distance calculation to differential speed calculation
 
  Dec 3    Will      change LIDAR to only take measurement when we read a measurement
+ 
  Dec 5    Tyler/Pat Fixed LIDAR driver to measure distance based on LIDAR documentation 
+ 
  Dec 4    Patrick   Error checked SCI
+ 
  Dec 6    Patrick   Fixed LIDAR drivers
+ 
  Dec 7    Patrick   Added kph/mph conversion, updated docs		  
 		      Pat's Docs
 		      
@@ -479,7 +486,7 @@ void main(void)
 	  //Make sure we've received the whole message
       if((((searchVal+8) % TSIZE) < rin) || ((rout > rin) && (searchVal+8 < rin+TSIZE))){ 
         if(parse_ascii_val(searchVal+6) >= 0){
-		      currSpeed = parse_ascii_val(searchVal+6) * 62 / 100;
+		      currSpeed = (unsigned char) (parse_ascii_val(searchVal+6) * 62 / 100);
 		} //Get byte after response byte
         clear_buffer();
         speedRequested = 0;
@@ -492,12 +499,12 @@ void main(void)
     } else{
       if (velDirection == 1){
          //Slow Down; 2
-        PWMDTY0 = (velocity < 25 ? 10 * velocity : 255);
+        PWMDTY0 = (char)(velocity < 25 ? 10 * velocity : 255);
         PWMDTY1 = 0;
         PWMDTY2 = 0;
       }else{
         //Speed up; 0
-        PWMDTY2 = (velocity < 25 ? 10 * velocity : 255);
+        PWMDTY2 = (char)(velocity < 25 ? 10 * velocity : 255);
         PWMDTY1 = 0;
         PWMDTY0 = 0;
       
