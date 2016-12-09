@@ -110,7 +110,8 @@ Section 6
   
   Nov 18  Will      Changed LED driver to not use a delay
                     wrote rudimentary LIDAR driver 
-  
+  Nov 18   Patrick  Added serial comm drivers  
+  Nov 21   Patrick  Started OBD board drivers
   Nov 30  Will      (PCB now made and soldered)
                     fixed many port declarations
                     tested LED up/down/dash
@@ -120,7 +121,8 @@ Section 6
                     reverse digit display order                             
                     invert polarities for the parts that are actually on the board
                     attempt software low-pass filter
- 
+  Nov 30   Patrick  Added more SCI functionality
+
  Dec 2    Everyone  Integration party
  
  Dec 2    Will      rewrote LIDAR driver to work now
@@ -130,7 +132,10 @@ Section 6
  Dec 2    Tyler     changed distance calculation to differential speed calculation
 
  Dec 3    Will      change LIDAR to only take measurement when we read a measurement
- 		  
+ Dec 4    Tyler     Fixed LIDAR bug
+ Dec 4    Patrick   Error checked SCI
+ Dec 6    Patrick   Fixed LIDAR drivers
+ Dec 7    Patrick   Added kph/mph conversion, updated docs		  
 		      Pat's Docs
 		      
 		      Tyler's Docs
