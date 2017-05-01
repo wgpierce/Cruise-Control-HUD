@@ -2,7 +2,7 @@
 Cruise control HUD MiniProject for ECE 362 and Purdue Spark Challenge
 
 
-##Setup
+## Setup
 
 Configuration and project files have been omitted since they carry no useful information
 and are a pain to track
@@ -18,7 +18,7 @@ File -> New Project -> \<family\> -> \<specific member\> -> \<whichever connecti
 After that, you can just copy the code from the main.c file in this repository to replace the main.c in 
 your projectFolder/Sources/ folder
 		
-##Technologies used
+## Technologies used
 
 #### Hardware
 - MC9S12C32 microcontroller board
